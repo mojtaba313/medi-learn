@@ -1,0 +1,136 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  ADMIN
+  STUDENT
+}
+
+enum CourseStatus {
+  PROCESSING
+  READY
+  FAILED
+}
+
+model User {
+  id           String              @id @default(cuid())
+  name         String
+  email        String              @unique
+  passwordHash String
+  role         Role                @default(STUDENT)
+  createdAt    DateTime            @default(now())
+  annotations  Annotation[]
+  responses    QuestionResponse[]
+  attempts     QuizAttempt[]
+  courses      Course[]
+}
+
+model Course {
+  id          String       @id @default(cuid())
+  title       String
+  description String
+  category    String
+  coverUrl    String?
+  pdfUrl      String?
+  status      CourseStatus @default(PROCESSING)
+  error       String?
+  totalPages  Int          @default(0)
+  createdById String
+  createdBy   User         @relation(fields: [createdById], references: [id], onDelete: Cascade)
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+  pages       Page[]
+  questions   Question[]
+  annotations Annotation[]
+  attempts    QuizAttempt[]
+}
+
+model Page {
+  id          String       @id @default(cuid())
+  courseId    String
+  course      Course       @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  pageNumber  Int
+  imageUrl    String
+  width       Int
+  height      Int
+  createdAt   DateTime     @default(now())
+  annotations Annotation[]
+  questions   Question[]
+
+  @@unique([courseId, pageNumber])
+  @@index([courseId])
+}
+
+model Annotation {
+  id         String   @id @default(cuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  courseId   String
+  course     Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  pageNumber Int
+  page       Page     @relation(fields: [courseId, pageNumber], references: [courseId, pageNumber], onDelete: Cascade)
+  data       Json
+  updatedAt  DateTime @updatedAt
+
+  @@unique([userId, courseId, pageNumber])
+  @@index([userId, courseId])
+}
+
+model Question {
+  id            String             @id @default(cuid())
+  courseId      String
+  course        Course             @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  pageNumber    Int?
+  page          Page?              @relation(fields: [courseId, pageNumber], references: [courseId, pageNumber], onDelete: SetNull)
+  text          String
+  optionA       String
+  optionB       String
+  optionC       String
+  optionD       String
+  correctOption String
+  explanation   String?
+  tags          String[]
+  createdAt     DateTime           @default(now())
+  responses     QuestionResponse[]
+
+  @@index([courseId, pageNumber])
+}
+
+model QuestionResponse {
+  id             String   @id @default(cuid())
+  userId         String
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  questionId     String
+  question       Question @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  selectedOption String?
+  isCorrect      Boolean?
+  timeSpentMs    Int      @default(0)
+  answeredAt     DateTime @default(now())
+
+  @@unique([userId, questionId])
+  @@index([userId])
+}
+
+model QuizAttempt {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  courseId  String
+  course    Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  mode      String
+  score     Int
+  total     Int
+  correct   Int
+  incorrect Int
+  skipped   Int
+  answers   Json
+  createdAt DateTime @default(now())
+
+  @@index([userId, courseId])
+}
