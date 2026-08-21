@@ -7,7 +7,7 @@ import { createContext, useContext, useEffect, useState } from "react";
 export interface SessionUser {
   id: string;
   name: string;
-  email: string;
+  username: string;
   role: "ADMIN" | "STUDENT";
 }
 

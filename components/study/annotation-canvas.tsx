@@ -4,6 +4,7 @@ import * as React from "react";
 import { useEffect, useRef, useState, useCallback } from "react";
 import { toast } from "sonner";
 import { useStudyStore } from "@/lib/store";
+import { safeFetch } from "@/lib/client/safe-fetch";
 import {
   createElementId,
   type AnnotationData,
@@ -60,8 +61,11 @@ export function AnnotationCanvas({
 
   const scaleFactor = React.useMemo(() => {
     if (!baseWidth || naturalWidth <= 0) return 1;
-    return baseWidth / naturalWidth;
-  }, [baseWidth, naturalWidth]);
+    // Must include zoom: the canvas bitmap and CSS size both scale with zoom,
+    // so annotations stored in natural PDF space must be drawn/hit-tested at the
+    // on-screen scale (baseWidth * zoom) or they drift when zoom changes.
+    return (baseWidth * zoom) / naturalWidth;
+  }, [baseWidth, naturalWidth, zoom]);
 
   const displaySize = React.useMemo(() => {
     if (!baseWidth) return { width: 0, height: 0 };
@@ -134,15 +138,16 @@ export function AnnotationCanvas({
 
     async function load() {
       try {
-        const res = await fetch(`/api/courses/${courseId}/annotations?pageNumber=${pageNumber}`, {
-          cache: "no-store",
-        });
+        const res = await safeFetch(
+          `/api/courses/${courseId}/annotations?pageNumber=${pageNumber}`,
+          { cache: "no-store" },
+        );
         if (res.ok) {
           const data = await res.json();
           setPageAnnotations(pageNumber, data.data ?? []);
         }
       } catch {
-        /* ignore load errors */
+        /* connection errors are surfaced via toast by safeFetch */
       } finally {
         setLoading(false);
       }
@@ -152,7 +157,7 @@ export function AnnotationCanvas({
 
   const persist = useCallback(() => {
     const data = useStudyStore.getState().annotationsByPage[pageNumber] ?? [];
-    fetch(`/api/courses/${courseId}/annotations`, {
+    safeFetch(`/api/courses/${courseId}/annotations`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ pageNumber, data }),

@@ -23,7 +23,11 @@ import { useAuth } from "@/components/auth-provider";
 
 const schema = z.object({
   name: z.string().min(2, "نام باید حداقل ۲ کاراکتر باشد"),
-  email: z.string().email("ایمیل معتبر نیست"),
+  username: z
+    .string()
+    .min(3, "نام کاربری حداقل ۳ کاراکتر باشد")
+    .max(30, "نام کاربری حداکثر ۳۰ کاراکتر باشد")
+    .regex(/^[\p{L}\p{N}_.]+$/u, "نام کاربری فقط شامل حروف، اعداد، _ و . باشد"),
   password: z.string().min(8, "رمز عبور باید حداقل ۸ کاراکتر باشد"),
   confirm: z.string(),
 }).refine((d) => d.password === d.confirm, {
@@ -52,7 +56,7 @@ export function RegisterForm() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           name: values.name,
-          email: values.email,
+          username: values.username,
           password: values.password,
         }),
       });
@@ -98,16 +102,17 @@ export function RegisterForm() {
             {errors.name && <p className="text-xs text-destructive">{errors.name.message}</p>}
           </div>
           <div className="space-y-2">
-            <Label htmlFor="email">ایمیل</Label>
+            <Label htmlFor="username">نام کاربری</Label>
             <Input
-              id="email"
-              type="email"
-              placeholder="you@example.com"
+              id="username"
+              placeholder="doctor_maryam"
               dir="ltr"
               className="text-right"
-              {...register("email")}
+              {...register("username")}
             />
-            {errors.email && <p className="text-xs text-destructive">{errors.email.message}</p>}
+            {errors.username && (
+              <p className="text-xs text-destructive">{errors.username.message}</p>
+            )}
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-2">

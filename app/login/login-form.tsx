@@ -22,7 +22,7 @@ import {
 import { useAuth } from "@/components/auth-provider";
 
 const schema = z.object({
-  email: z.string().email("ایمیل معتبر نیست"),
+  username: z.string().min(1, "نام کاربری را وارد کنید"),
   password: z.string().min(1, "رمز عبور را وارد کنید"),
 });
 
@@ -84,17 +84,16 @@ export function LoginForm() {
       <CardContent>
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="email">ایمیل</Label>
+            <Label htmlFor="username">نام کاربری</Label>
             <Input
-              id="email"
-              type="email"
-              placeholder="you@example.com"
+              id="username"
+              placeholder="doctor_maryam"
               dir="ltr"
               className="text-right"
-              {...register("email")}
+              {...register("username")}
             />
-            {errors.email && (
-              <p className="text-xs text-destructive">{errors.email.message}</p>
+            {errors.username && (
+              <p className="text-xs text-destructive">{errors.username.message}</p>
             )}
           </div>
           <div className="space-y-2">

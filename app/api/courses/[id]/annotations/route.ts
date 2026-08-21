@@ -2,7 +2,7 @@ import { NextRequest } from "next/server";
 import { z } from "zod";
 import { db } from "@/lib/db";
 import { getSession } from "@/lib/auth";
-import { err, readJson, ok } from "@/lib/api";
+import { err, readJson, ok, dbUnavailable, isDbConnectionError } from "@/lib/api";
 import { parseAnnotationData } from "@/lib/annotations";
 
 const annotationSchema = z.object({
@@ -31,17 +31,22 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     return err("شماره صفحه نامعتبر است", 422);
   }
 
-  const annotation = await db.annotation.findUnique({
-    where: {
-      userId_courseId_pageNumber: {
-        userId: session.userId,
-        courseId: id,
-        pageNumber,
+  try {
+    const annotation = await db.annotation.findUnique({
+      where: {
+        userId_courseId_pageNumber: {
+          userId: session.userId,
+          courseId: id,
+          pageNumber,
+        },
       },
-    },
-  });
+    });
 
-  return ok({ data: parseAnnotationData(annotation?.data) });
+    return ok({ data: parseAnnotationData(annotation?.data) });
+  } catch (e) {
+    if (isDbConnectionError(e)) return dbUnavailable(e);
+    throw e;
+  }
 }
 
 export async function PUT(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -58,29 +63,34 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
 
   const { pageNumber, data } = parsed.data;
 
-  const page = await db.page.findUnique({
-    where: { courseId_pageNumber: { courseId: id, pageNumber } },
-  });
-  if (!page) return err("صفحه پیدا نشد", 404);
+  try {
+    const page = await db.page.findUnique({
+      where: { courseId_pageNumber: { courseId: id, pageNumber } },
+    });
+    if (!page) return err("صفحه پیدا نشد", 404);
 
-  const annotation = await db.annotation.upsert({
-    where: {
-      userId_courseId_pageNumber: {
+    const annotation = await db.annotation.upsert({
+      where: {
+        userId_courseId_pageNumber: {
+          userId: session.userId,
+          courseId: id,
+          pageNumber,
+        },
+      },
+      create: {
         userId: session.userId,
         courseId: id,
         pageNumber,
+        data: data as never,
       },
-    },
-    create: {
-      userId: session.userId,
-      courseId: id,
-      pageNumber,
-      data: data as never,
-    },
-    update: {
-      data: data as never,
-    },
-  });
+      update: {
+        data: data as never,
+      },
+    });
 
-  return ok({ annotation: { id: annotation.id, updatedAt: annotation.updatedAt } });
+    return ok({ annotation: { id: annotation.id, updatedAt: annotation.updatedAt } });
+  } catch (e) {
+    if (isDbConnectionError(e)) return dbUnavailable(e);
+    throw e;
+  }
 }

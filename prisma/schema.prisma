@@ -19,36 +19,38 @@ enum CourseStatus {
 }
 
 model User {
-  id           String              @id @default(cuid())
-  name         String
-  email        String              @unique
-  passwordHash String
-  role         Role                @default(STUDENT)
-  createdAt    DateTime            @default(now())
-  annotations  Annotation[]
-  responses    QuestionResponse[]
-  attempts     QuizAttempt[]
-  courses      Course[]
+  id             String             @id @default(cuid())
+  name           String
+  username       String             @unique
+  passwordHash   String
+  role           Role               @default(STUDENT)
+  createdAt      DateTime           @default(now())
+  annotations    Annotation[]
+  responses      QuestionResponse[]
+  attempts       QuizAttempt[]
+  sampleAttempts SampleAttempt[]
+  courses        Course[]
 }
 
 model Course {
-  id          String       @id @default(cuid())
+  id          String        @id @default(cuid())
   title       String
   description String
   category    String
   coverUrl    String?
   pdfUrl      String?
-  status      CourseStatus @default(PROCESSING)
+  status      CourseStatus  @default(PROCESSING)
   error       String?
-  totalPages  Int          @default(0)
+  totalPages  Int           @default(0)
   createdById String
-  createdBy   User         @relation(fields: [createdById], references: [id], onDelete: Cascade)
-  createdAt   DateTime     @default(now())
-  updatedAt   DateTime     @updatedAt
+  createdBy   User          @relation(fields: [createdById], references: [id], onDelete: Cascade)
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
   pages       Page[]
   questions   Question[]
   annotations Annotation[]
   attempts    QuizAttempt[]
+  sampleSets  SampleSet[]
 }
 
 model Page {
@@ -133,4 +135,78 @@ model QuizAttempt {
   createdAt DateTime @default(now())
 
   @@index([userId, courseId])
+}
+
+enum SampleAttemptMode {
+  EXAM
+  PRACTICE
+}
+
+model SampleSet {
+  id               String           @id @default(cuid())
+  courseId         String
+  course           Course           @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  title            String
+  description      String?
+  timeLimitMinutes Int?
+  createdById      String?
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+  questions        SampleQuestion[]
+  attempts         SampleAttempt[]
+
+  @@index([courseId])
+}
+
+model SampleQuestion {
+  id              String           @id @default(cuid())
+  sampleSetId     String
+  sampleSet       SampleSet        @relation(fields: [sampleSetId], references: [id], onDelete: Cascade)
+  text            String
+  optionA         String
+  optionB         String
+  optionC         String
+  optionD         String
+  correctOption   String
+  explanation     String?
+  order           Int              @default(0)
+  createdAt       DateTime         @default(now())
+  sampleResponses SampleResponse[]
+
+  @@index([sampleSetId])
+}
+
+model SampleAttempt {
+  id              String            @id @default(cuid())
+  userId          String
+  user            User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  sampleSetId     String
+  sampleSet       SampleSet         @relation(fields: [sampleSetId], references: [id], onDelete: Cascade)
+  mode            SampleAttemptMode @default(PRACTICE)
+  score           Int?
+  total           Int?
+  correct         Int?
+  incorrect       Int?
+  unanswered      Int?
+  durationMs      Int?
+  startedAt       DateTime          @default(now())
+  submittedAt     DateTime?
+  sampleResponses SampleResponse[]
+
+  @@index([userId])
+  @@index([sampleSetId])
+}
+
+model SampleResponse {
+  id               String         @id @default(cuid())
+  attemptId        String
+  attempt          SampleAttempt  @relation(fields: [attemptId], references: [id], onDelete: Cascade)
+  sampleQuestionId String
+  sampleQuestion   SampleQuestion @relation(fields: [sampleQuestionId], references: [id], onDelete: Cascade)
+  selectedOption   String?
+  isCorrect        Boolean?
+  timeSpentMs      Int            @default(0)
+
+  @@index([attemptId])
+  @@index([sampleQuestionId])
 }

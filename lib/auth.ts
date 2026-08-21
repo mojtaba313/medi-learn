@@ -12,7 +12,7 @@ const SECRET = new TextEncoder().encode(
 export interface SessionPayload {
   userId: string;
   name: string;
-  email: string;
+  username: string;
   role: "ADMIN" | "STUDENT";
 }
 
@@ -70,7 +70,7 @@ export async function getCurrentUser() {
   if (!session) return null;
   const user = await db.user.findUnique({
     where: { id: session.userId },
-    select: { id: true, name: true, email: true, role: true, createdAt: true },
+    select: { id: true, name: true, username: true, role: true, createdAt: true },
   });
   return user;
 }

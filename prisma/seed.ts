@@ -4,13 +4,13 @@ import bcrypt from "bcryptjs";
 const prisma = new PrismaClient();
 
 async function main() {
-  const email = process.env.ADMIN_EMAIL ?? "admin@medilearn.app";
+  const username = (process.env.ADMIN_USERNAME ?? "admin").toLowerCase();
   const password = process.env.ADMIN_PASSWORD ?? "admin1234";
   const name = process.env.ADMIN_NAME ?? "مدیر";
 
-  const existing = await prisma.user.findUnique({ where: { email } });
+  const existing = await prisma.user.findUnique({ where: { username } });
   if (existing) {
-    console.log(`✅ کاربر مدیر از قبل وجود دارد: ${email}`);
+    console.log(`✅ کاربر مدیر از قبل وجود دارد: ${username}`);
     return;
   }
 
@@ -18,14 +18,14 @@ async function main() {
 
   await prisma.user.create({
     data: {
-      email,
+      username,
       name,
       passwordHash,
       role: "ADMIN",
     },
   });
 
-  console.log(`✅ حساب مدیر ایجاد شد: ${email} (رمز: ${password})`);
+  console.log(`✅ حساب مدیر ایجاد شد: ${username} (رمز: ${password})`);
 }
 
 main()

@@ -13,6 +13,7 @@ import {
   Hand,
   Highlighter,
   Keyboard,
+  ListChecks,
   ListVideo,
   MousePointer2,
   Pen,
@@ -43,6 +44,7 @@ import {
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useStudyStore } from "@/lib/store";
 import { cn, toFa } from "@/lib/utils";
+import { safeFetch } from "@/lib/client/safe-fetch";
 import { PEN_COLORS } from "@/lib/constants";
 import type { AnnotationToolType } from "@/lib/annotations";
 
@@ -352,15 +354,23 @@ function TopBar({
         </div>
         <Badge variant="secondary">{course.category}</Badge>
       </div>
-      <Button
-        variant="outline"
-        size="sm"
-        className="rounded-full gap-2"
-        onClick={onToggleQuiz}
-      >
-        <ListVideo className="h-4 w-4" />
-        <span className="hidden sm:inline">سوالات صفحه</span>
-      </Button>
+      <div className="flex items-center gap-2">
+        <Button asChild variant="outline" size="sm" className="rounded-full gap-2">
+          <Link href={`/study/${course.id}/sample`}>
+            <ListChecks className="h-4 w-4" />
+            <span className="hidden sm:inline">نمونه سوالات</span>
+          </Link>
+        </Button>
+        <Button
+          variant="outline"
+          size="sm"
+          className="rounded-full gap-2"
+          onClick={onToggleQuiz}
+        >
+          <ListVideo className="h-4 w-4" />
+          <span className="hidden sm:inline">سوالات صفحه</span>
+        </Button>
+      </div>
     </div>
   );
 }
@@ -601,7 +611,7 @@ function BottomBar({
   const idx = pages.indexOf(currentPage) + 1;
   return (
     <div className="flex h-14 items-center justify-between gap-3 border-t border-border/60 bg-card/80 px-4 backdrop-blur-xl">
-      <div className="hidden items-center gap-2 sm:flex">
+      <div className="flex items-center gap-2">
         <Button
           variant="outline"
           size="iconSm"
@@ -610,21 +620,23 @@ function BottomBar({
         >
           <ChevronRight className="h-4 w-4" />
         </Button>
-        <Select
-          value={String(currentPage)}
-          onValueChange={(v) => onSelectPage(Number(v))}
-        >
-          <SelectTrigger className="h-8 w-28">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {pages.map((p) => (
-              <SelectItem key={p} value={String(p)}>
-                صفحه {toFa(p)}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        <div className="hidden sm:flex">
+          <Select
+            value={String(currentPage)}
+            onValueChange={(v) => onSelectPage(Number(v))}
+          >
+            <SelectTrigger className="h-8 w-28">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {pages.map((p) => (
+                <SelectItem key={p} value={String(p)}>
+                  صفحه {toFa(p)}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
         <Button
           variant="outline"
           size="iconSm"
@@ -668,7 +680,7 @@ function PageQuestionsPanel({
   async function answer(questionId: string, option: string) {
     setAnswered((prev) => ({ ...prev, [questionId]: option }));
     try {
-      const res = await fetch(`/api/questions/${questionId}/respond`, {
+      const res = await safeFetch(`/api/questions/${questionId}/respond`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ selectedOption: option, timeSpentMs: 0 }),

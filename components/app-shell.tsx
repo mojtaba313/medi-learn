@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { motion } from "motion/react";
 import { usePathname } from "next/navigation";
-import { Activity, BookOpen, LayoutDashboard, LogOut, Shield, Stethoscope, User } from "lucide-react";
+import { Activity, BookOpen, Heart, LayoutDashboard, LogOut, Shield, Stethoscope, User } from "lucide-react";
 import { useAuth } from "@/components/auth-provider";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { Button } from "@/components/ui/button";
@@ -70,7 +70,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                   <DropdownMenuLabel>
                     <div className="flex flex-col gap-1">
                       <span className="text-sm font-medium">{user.name}</span>
-                      <span className="text-xs text-muted-foreground">{user.email}</span>
+                      <span className="text-xs text-muted-foreground">{user.username}</span>
                     </div>
                   </DropdownMenuLabel>
                   <DropdownMenuSeparator />
@@ -104,16 +104,25 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </div>
       </header>
       {children}
-      <footer className="border-t border-border/60 py-8">
+      <footer className="border-t border-border/60 py-6">
         <div className="mx-auto flex max-w-7xl flex-col items-center justify-between gap-3 px-4 text-sm text-muted-foreground sm:flex-row">
           <div className="flex items-center gap-2">
             <Activity className="h-4 w-4 text-teal-500" />
             <span>مدی‌لرن - پلتفرم یادگیری دانشجویان پزشکی</span>
           </div>
-          <div className="flex items-center gap-4">
-            <Link href="/" className="hover:text-foreground">خانه</Link>
-            <Link href="/login" className="hover:text-foreground">ورود</Link>
-          </div>
+          <p className="flex flex-wrap items-center justify-center gap-1">
+            <span>توسعه داده شده با</span>
+            <Heart className="h-4 w-4 fill-primary text-primary" />
+            <span>توسط</span>
+            <a
+              href="https://github.com/mojtaba313"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="font-medium text-primary transition-colors hover:underline"
+            >
+              مجتبی
+            </a>
+          </p>
         </div>
       </footer>
     </div>

@@ -10,6 +10,7 @@ import {
   BookOpen,
   FileQuestion,
   Image as ImageIcon,
+  ListChecks,
   Pencil,
   Save,
   Trash2,
@@ -115,6 +116,12 @@ export function CourseDetailClient({ course }: { course: CourseDetail }) {
             <Link href={`/admin/course/${course.id}/questions`}>
               <FileQuestion className="ml-2" />
               مدیریت سوالات
+            </Link>
+          </Button>
+          <Button asChild variant="outline" className="rounded-xl">
+            <Link href={`/admin/course/${course.id}/sample-sets`}>
+              <ListChecks className="ml-2" />
+              نمونه سوالات
             </Link>
           </Button>
           <Dialog open={deleteOpen} onOpenChange={setDeleteOpen}>

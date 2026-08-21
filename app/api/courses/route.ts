@@ -1,7 +1,7 @@
 import { NextRequest } from "next/server";
 import { db } from "@/lib/db";
 import { requireAdmin } from "@/lib/auth";
-import { err, ok } from "@/lib/api";
+import { err, ok, dbUnavailable, isDbConnectionError } from "@/lib/api";
 import {
   courseKey,
   courseSourceKey,
@@ -12,26 +12,31 @@ import {
 
 export async function GET() {
   const user = await requireAdmin();
-  const courses = await db.course.findMany({
-    where: user.role === "ADMIN" ? {} : { createdById: user.id },
-    include: {
-      _count: { select: { pages: true, questions: true } },
-    },
-    orderBy: { createdAt: "desc" },
-  });
+  try {
+    const courses = await db.course.findMany({
+      where: user.role === "ADMIN" ? {} : { createdById: user.id },
+      include: {
+        _count: { select: { pages: true, questions: true } },
+      },
+      orderBy: { createdAt: "desc" },
+    });
 
-  const pageCounts = await db.page.groupBy({
-    by: ["courseId"],
-    _count: { _all: true },
-  });
-  const counts = new Map(pageCounts.map((p) => [p.courseId, p._count._all]));
+    const pageCounts = await db.page.groupBy({
+      by: ["courseId"],
+      _count: { _all: true },
+    });
+    const counts = new Map(pageCounts.map((p) => [p.courseId, p._count._all]));
 
-  const response = courses.map((c) => ({
-    ...c,
-    totalPages: counts.get(c.id) ?? 0,
-  }));
+    const response = courses.map((c) => ({
+      ...c,
+      totalPages: counts.get(c.id) ?? 0,
+    }));
 
-  return ok({ courses: response });
+    return ok({ courses: response });
+  } catch (e) {
+    if (isDbConnectionError(e)) return dbUnavailable(e);
+    throw e;
+  }
 }
 
 export async function POST(request: NextRequest) {

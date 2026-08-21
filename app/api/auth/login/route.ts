@@ -5,7 +5,7 @@ import { verifyPassword, createSession } from "@/lib/auth";
 import { err, readJson } from "@/lib/api";
 
 const loginSchema = z.object({
-  email: z.string().trim().email("ایمیل معتبر نیست").toLowerCase(),
+  username: z.string().trim().min(1, "نام کاربری را وارد کنید").toLowerCase(),
   password: z.string().min(1, "رمز عبور را وارد کنید"),
 });
 
@@ -16,15 +16,15 @@ export async function POST(request: NextRequest) {
   const parsed = loginSchema.safeParse(body);
   if (!parsed.success) return err(parsed.error.issues[0]?.message ?? "داده‌های ورودی نامعتبر است", 422);
 
-  const { email, password } = parsed.data;
-  const user = await db.user.findUnique({ where: { email } });
+  const { username, password } = parsed.data;
+  const user = await db.user.findUnique({ where: { username } });
   if (!user || !(await verifyPassword(password, user.passwordHash))) {
-    return err("ایمیل یا رمز عبور اشتباه است", 401);
+    return err("نام کاربری یا رمز عبور اشتباه است", 401);
   }
 
-  await createSession({ userId: user.id, name: user.name, email: user.email, role: user.role });
+  await createSession({ userId: user.id, name: user.name, username: user.username, role: user.role });
 
   return NextResponse.json({
-    user: { id: user.id, name: user.name, email: user.email, role: user.role },
+    user: { id: user.id, name: user.name, username: user.username, role: user.role },
   });
 }
