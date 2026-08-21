@@ -6,15 +6,19 @@
     "predev": "node scripts/copy-pdf-worker.mjs",
     "dev": "next dev",
     "prebuild": "node scripts/copy-pdf-worker.mjs",
-    "build": "next build --webpack",
-    "postinstall": "node scripts/copy-pdf-worker.mjs",
+    "build": "prisma migrate deploy && next build --webpack",
+    "postinstall": "prisma generate && node scripts/copy-pdf-worker.mjs",
     "start": "next start",
     "lint": "eslint",
     "db:generate": "prisma generate",
     "db:push": "prisma db push",
     "db:migrate": "prisma migrate dev",
+    "db:deploy": "prisma migrate deploy",
     "db:seed": "prisma db seed",
     "db:studio": "prisma studio"
+  },
+  "engines": {
+    "node": ">=20"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"
