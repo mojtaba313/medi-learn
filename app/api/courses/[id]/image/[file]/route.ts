@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
-import { s3, BUCKET } from "@/lib/s3";
-import { GetObjectCommand } from "@aws-sdk/client-s3";
+import { streamObject } from "@/lib/s3";
 
 export const dynamic = "force-dynamic";
 
@@ -17,19 +16,13 @@ export async function GET(
   const { id, file } = await params;
   if (!SAFE.test(file)) return new NextResponse("درخواست نامعتبر", { status: 400 });
 
-  const key = `courses/${id}/${file}`;
   try {
-    const res = await s3.send(
-      new GetObjectCommand({ Bucket: BUCKET, Key: key }),
-    );
-    if (!res.Body) return new NextResponse("یافت نشد", { status: 404 });
+    const res = await streamObject(`courses/${id}/${file}`);
     const headers = new Headers();
-    if (res.ContentType) headers.set("Content-Type", res.ContentType);
+    headers.set("Content-Type", res.contentType);
+    if (res.size) headers.set("Content-Length", String(res.size));
     headers.set("Cache-Control", "public, max-age=31536000, immutable");
-    return new NextResponse(res.Body.transformToWebStream(), {
-      status: 200,
-      headers,
-    });
+    return new NextResponse(res.stream, { status: 200, headers });
   } catch {
     return new NextResponse("یافت نشد", { status: 404 });
   }

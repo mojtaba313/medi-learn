@@ -6,11 +6,13 @@ import { motion } from "motion/react";
 import {
   Activity,
   BookOpen,
+  Brain,
   CheckCircle2,
   Clock,
   FileQuestion,
   Flame,
   Gauge,
+  Layers,
   Lightbulb,
   Plus,
   Sparkles,
@@ -19,6 +21,7 @@ import {
 import { AppShell } from "@/components/app-shell";
 import { CourseCard } from "@/components/course-card";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Progress } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn, toFa, toFaWithSeparator, formatRelative, formatDuration } from "@/lib/utils";
 import { useAuth } from "@/components/auth-provider";
@@ -41,6 +44,24 @@ interface DashboardStats {
     lastStudy: string | null;
     recommendations: { pageNumber: number; wrong: number; total: number }[];
   }[];
+  modules: {
+    id: string;
+    title: string;
+    description: string;
+    lessonCount: number;
+    done: number;
+    percent: number;
+    notes: number;
+    highlights: number;
+    bookmarks: number;
+    dueCards: number;
+    questionCount: number;
+    flashcardCount: number;
+    quizPercent: number;
+    quizAttempts: number;
+    lastActivity: string | null;
+  }[];
+  studyHeatmap: { date: string; minutes: number }[];
   overall: {
     totalAnswered: number;
     totalCorrect: number;
@@ -48,11 +69,24 @@ interface DashboardStats {
     totalStudyTimeSeconds: number;
     totalAttempts: number;
     totalCourses: number;
+    totalModules: number;
+    totalLessons: number;
+    completedLessons: number;
+    notes: number;
+    highlights: number;
+    bookmarks: number;
+    dueCards: number;
+    moduleQuizAttempts: number;
+    moduleQuizAccuracy: number;
+    totalStudyMinutes: number;
+    todayMinutes: number;
+    studyStreak: number;
   };
   recentActivity: {
-    type: "quiz" | "study" | "question";
+    type: "quiz" | "study" | "question" | "module-quiz";
     courseId: string;
     courseTitle: string;
+    moduleId?: string;
     detail: string;
     score: number | null;
     total: number | null;
@@ -139,6 +173,119 @@ export function DashboardClient({
                 color="text-violet-500"
                 delay={0.15}
               />
+            </div>
+
+            <div className="mb-8 grid gap-6 lg:grid-cols-3">
+              <Card className="lg:col-span-2">
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
+                  <CardTitle className="flex items-center gap-2 text-base">
+                    <Layers className="h-4 w-4 text-teal-500" />
+                    ماژول‌های مطالعه
+                  </CardTitle>
+                  <ButtonAsLink href="/modules" className="gap-1 text-xs">
+                    همه ماژول‌ها
+                    <ChevronLeftIcon />
+                  </ButtonAsLink>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  {stats.modules.length === 0 ? (
+                    <p className="py-6 text-center text-sm text-muted-foreground">
+                      هنوز ماژولی برای مطالعه وارد نشده است.
+                    </p>
+                  ) : (
+                    stats.modules.map((module) => (
+                      <Link
+                        key={module.id}
+                        href={`/modules/${module.id}`}
+                        className="block rounded-xl border border-border/60 p-3 transition-colors hover:border-teal-500/40 hover:bg-muted/30"
+                      >
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="min-w-0">
+                            <p className="truncate text-sm font-semibold">{module.title}</p>
+                            <p className="mt-0.5 line-clamp-1 text-xs text-muted-foreground">
+                              {module.description}
+                            </p>
+                          </div>
+                          <span className="shrink-0 rounded-full bg-teal-500/10 px-2 py-0.5 text-[10px] font-medium text-teal-600 dark:text-teal-400">
+                            {toFa(module.percent)}٪
+                          </span>
+                        </div>
+                        <div className="mt-2">
+                          <Progress value={module.percent} className="h-1.5" />
+                        </div>
+                        <div className="mt-2 flex flex-wrap items-center gap-3 text-[10px] text-muted-foreground">
+                          <span>
+                            {toFa(module.done)} از {toFa(module.lessonCount)} درس
+                          </span>
+                          {module.dueCards > 0 && (
+                            <span className="text-amber-600 dark:text-amber-400">
+                              {toFa(module.dueCards)} کارت سررسید
+                            </span>
+                          )}
+                          {module.quizAttempts > 0 && (
+                            <span>دقت آزمون {toFa(module.quizPercent)}٪</span>
+                          )}
+                          {module.highlights > 0 && (
+                            <span>{toFa(module.highlights)} هایلایت</span>
+                          )}
+                        </div>
+                      </Link>
+                    ))
+                  )}
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader className="pb-3">
+                  <CardTitle className="flex items-center gap-2 text-base">
+                    <Flame className="h-4 w-4 text-amber-500" />
+                    استریک مطالعه
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="mb-4 flex items-end justify-between">
+                    <div>
+                      <p className="text-3xl font-black text-amber-500">
+                        {toFa(stats.overall.studyStreak)}
+                      </p>
+                      <p className="text-xs text-muted-foreground">روز پیوسته</p>
+                    </div>
+                    <div className="text-left">
+                      <p className="text-lg font-bold">{toFa(stats.overall.todayMinutes)}</p>
+                      <p className="text-[10px] text-muted-foreground">دقیقه امروز</p>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-[repeat(13,minmax(0,1fr))] gap-1">
+                    {stats.studyHeatmap.map((day) => (
+                      <span
+                        key={day.date}
+                        title={`${day.date}: ${toFa(day.minutes)} دقیقه`}
+                        className={cn(
+                          "aspect-square rounded-[3px]",
+                          day.minutes === 0
+                            ? "bg-muted"
+                            : day.minutes < 15
+                              ? "bg-teal-500/20"
+                              : day.minutes < 30
+                                ? "bg-teal-500/40"
+                                : day.minutes < 60
+                                  ? "bg-teal-500/60"
+                                  : "bg-teal-500/90",
+                        )}
+                      />
+                    ))}
+                  </div>
+                  <div className="mt-3 flex items-center justify-between text-[10px] text-muted-foreground">
+                    <span>۹۱ روز اخیر</span>
+                    <span>مجموع {toFa(stats.overall.totalStudyMinutes)} دقیقه</span>
+                  </div>
+                  {stats.overall.dueCards > 0 && (
+                    <div className="mt-4 rounded-xl border border-amber-500/20 bg-amber-500/5 px-3 py-2 text-xs text-amber-700 dark:text-amber-300">
+                      {toFa(stats.overall.dueCards)} فلش‌کارت برای مرور امروز آماده است.
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
             </div>
 
             <div className="grid gap-6 lg:grid-cols-3">
@@ -286,7 +433,7 @@ export function DashboardClient({
                             <span
                               className={cn(
                                 "z-10 flex h-7 w-7 shrink-0 items-center justify-center rounded-full",
-                                item.type === "quiz"
+                                item.type === "quiz" || item.type === "module-quiz"
                                   ? "bg-violet-500/15 text-violet-500"
                                   : item.type === "study"
                                   ? "bg-teal-500/15 text-teal-500"
@@ -295,7 +442,9 @@ export function DashboardClient({
                                   : "bg-red-500/15 text-red-500"
                               )}
                             >
-                              {item.type === "quiz" ? (
+                              {item.type === "module-quiz" ? (
+                                <Brain className="h-3.5 w-3.5" />
+                              ) : item.type === "quiz" ? (
                                 <Target className="h-3.5 w-3.5" />
                               ) : item.type === "study" ? (
                                 <BookOpen className="h-3.5 w-3.5" />
@@ -333,6 +482,24 @@ export function DashboardClient({
         )}
       </main>
     </AppShell>
+  );
+}
+
+function ChevronLeftIcon() {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className="h-3.5 w-3.5"
+      aria-hidden="true"
+    >
+      <path d="m15 18-6-6 6-6" />
+    </svg>
   );
 }
 

@@ -19,17 +19,27 @@ enum CourseStatus {
 }
 
 model User {
-  id             String             @id @default(cuid())
-  name           String
-  username       String             @unique
-  passwordHash   String
-  role           Role               @default(STUDENT)
-  createdAt      DateTime           @default(now())
-  annotations    Annotation[]
-  responses      QuestionResponse[]
-  attempts       QuizAttempt[]
-  sampleAttempts SampleAttempt[]
-  courses        Course[]
+  id                      String                   @id @default(cuid())
+  name                    String
+  username                String                   @unique
+  passwordHash            String
+  role                    Role                     @default(STUDENT)
+  createdAt               DateTime                 @default(now())
+  annotations             Annotation[]
+  responses               QuestionResponse[]
+  attempts                QuizAttempt[]
+  sampleAttempts          SampleAttempt[]
+  courses                 Course[]
+  preferences             UserPreference?
+  lessonProgress          LessonProgress[]
+  lessonNotes             LessonNote[]
+  lessonAnnotations       LessonAnnotation[]
+  assetAnnotations        AssetAnnotation[]
+  bookmarks               Bookmark[]
+  moduleQuestionResponses ModuleQuestionResponse[]
+  moduleQuizAttempts      ModuleQuizAttempt[]
+  flashcardReviews        FlashcardReview[]
+  studySessions           StudySession[]
 }
 
 model Course {
@@ -209,4 +219,265 @@ model SampleResponse {
 
   @@index([attemptId])
   @@index([sampleQuestionId])
+}
+
+model Module {
+  id                String              @id
+  slug              String              @unique
+  kind              String              @default("STRUCTURED")
+  order             Int                 @default(0)
+  number            Int                 @default(0)
+  title             String
+  cardTitle         String
+  eyebrow           String?
+  cardDescription   String?
+  description       String
+  pills             String[]            @default([])
+  footer            String?
+  gallery           Json?
+  referencesTitle   String?
+  referencesIntro   String?
+  referencesHtml    String?
+  quizTitle         String?
+  quizDescription   String?
+  quizNavLabel      String?
+  createdById       String?
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
+  lessons           Lesson[]
+  assets            ModuleAsset[]
+  questions         ModuleQuestion[]
+  flashcards        Flashcard[]
+  quizAttempts      ModuleQuizAttempt[]
+  studySessions     StudySession[]
+}
+
+model Lesson {
+  id          String             @id
+  moduleId    String
+  module      Module             @relation(fields: [moduleId], references: [id], onDelete: Cascade)
+  slug        String
+  order       Int                @default(0)
+  title       String
+  mins        String?
+  source      String?
+  summary     String?
+  html        String             @default("")
+  blocks      Json?
+  searchText  String             @default("")
+  createdAt   DateTime           @default(now())
+  updatedAt   DateTime           @updatedAt
+  progress    LessonProgress[]
+  notes       LessonNote[]
+  annotations LessonAnnotation[]
+  bookmarks   Bookmark[]
+
+  @@unique([moduleId, slug])
+  @@index([moduleId, order])
+}
+
+model ModuleQuestion {
+  id            String                   @id
+  moduleId      String
+  module        Module                   @relation(fields: [moduleId], references: [id], onDelete: Cascade)
+  lessonSlug    String?
+  blockId       String?
+  order         Int                      @default(0)
+  text          String
+  optionA       String
+  optionB       String
+  optionC       String
+  optionD       String
+  correctOption String
+  explanation   String
+  topic         String?
+  createdAt     DateTime                 @default(now())
+  responses     ModuleQuestionResponse[]
+
+  @@index([moduleId, order])
+}
+
+model ModuleQuestionResponse {
+  id             String         @id @default(cuid())
+  userId         String
+  user           User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  questionId     String
+  question       ModuleQuestion @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  selectedOption String?
+  isCorrect      Boolean?
+  timeSpentMs    Int            @default(0)
+  answeredAt     DateTime       @default(now())
+
+  @@unique([userId, questionId])
+  @@index([userId])
+}
+
+model ModuleQuizAttempt {
+  id               String   @id @default(cuid())
+  userId           String
+  user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  moduleId         String
+  module           Module   @relation(fields: [moduleId], references: [id], onDelete: Cascade)
+  mode             String   @default("STUDY")
+  score            Int
+  total            Int
+  correct          Int
+  incorrect        Int
+  skipped          Int
+  answers          Json
+  topicStats       Json?
+  wrongQuestionIds String[] @default([])
+  createdAt        DateTime @default(now())
+
+  @@index([userId, moduleId])
+}
+
+model ModuleAsset {
+  id         String            @id @default(cuid())
+  moduleId   String
+  module     Module            @relation(fields: [moduleId], references: [id], onDelete: Cascade)
+  assetId    String
+  kind       String            @default("IMAGE")
+  fileName   String
+  mimeType   String
+  size       Int               @default(0)
+  width      Int?
+  height     Int?
+  storageKey String
+  createdAt  DateTime          @default(now())
+  annotations AssetAnnotation[]
+
+  @@unique([moduleId, assetId])
+  @@index([moduleId])
+}
+
+model AssetAnnotation {
+  id        String      @id @default(cuid())
+  userId    String
+  user      User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  moduleId  String
+  assetId   String
+  asset     ModuleAsset @relation(fields: [assetId], references: [id], onDelete: Cascade)
+  blockId   String
+  data      Json
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
+
+  @@unique([userId, assetId, blockId])
+  @@index([userId, moduleId])
+}
+
+model Flashcard {
+  id         String            @id
+  moduleId   String
+  module     Module            @relation(fields: [moduleId], references: [id], onDelete: Cascade)
+  order      Int               @default(0)
+  term       String
+  definition String
+  reviews    FlashcardReview[]
+
+  @@index([moduleId, order])
+}
+
+model FlashcardReview {
+  id        String    @id @default(cuid())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  cardId    String
+  card      Flashcard @relation(fields: [cardId], references: [id], onDelete: Cascade)
+  interval  Int       @default(0)
+  ease      Float     @default(2.5)
+  reps      Int       @default(0)
+  lapses    Int       @default(0)
+  due       DateTime  @default(now())
+  last      DateTime?
+  updatedAt DateTime  @updatedAt
+
+  @@unique([userId, cardId])
+  @@index([userId, due])
+}
+
+model LessonProgress {
+  id           String    @id @default(cuid())
+  userId       String
+  user         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  lessonId     String
+  lesson       Lesson    @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+  done         Boolean   @default(false)
+  lastOpenedAt DateTime?
+  updatedAt    DateTime  @updatedAt
+
+  @@unique([userId, lessonId])
+  @@index([userId])
+}
+
+model LessonNote {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  lessonId  String
+  lesson    Lesson   @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+  text      String
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, lessonId])
+}
+
+model LessonAnnotation {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  lessonId    String
+  lesson      Lesson   @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+  blockId     String?
+  color       String
+  note        String?
+  quote       String
+  startPath   Int[]
+  startOffset Int
+  endPath     Int[]
+  endOffset   Int
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([userId, lessonId])
+}
+
+model Bookmark {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  lessonId  String
+  lesson    Lesson   @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@unique([userId, lessonId])
+}
+
+model StudySession {
+  id        String    @id @default(cuid())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  moduleId  String?
+  module    Module?   @relation(fields: [moduleId], references: [id], onDelete: SetNull)
+  courseId  String?
+  minutes   Int
+  kind      String    @default("focus")
+  startedAt DateTime  @default(now())
+  endedAt   DateTime?
+
+  @@index([userId, startedAt])
+}
+
+model UserPreference {
+  userId           String   @id
+  user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  theme            String   @default("dark")
+  fontSize         String   @default("md")
+  lineHeight       String   @default("normal")
+  readingWidth     String   @default("normal")
+  dailyGoalMinutes Int      @default(60)
+  pomodoroFocus    Int      @default(25)
+  pomodoroBreak    Int      @default(5)
+  updatedAt        DateTime @updatedAt
 }

@@ -60,8 +60,8 @@ export async function POST(request: NextRequest) {
   ) {
     return err("فقط فایل‌های PDF پشتیبانی می‌شوند", 422);
   }
-  if (file.size > 200 * 1024 * 1024) {
-    return err("حجم فایل نباید بیشتر از ۲۰۰ مگابایت باشد", 422);
+  if (file.size > 95 * 1024 * 1024) {
+    return err("حجم فایل نباید بیشتر از ۹۵ مگابایت باشد", 422);
   }
 
   const imageBlobs = images.filter((x): x is File => x instanceof File);

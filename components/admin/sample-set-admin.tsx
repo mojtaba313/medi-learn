@@ -393,7 +393,8 @@ function SetQuestionsPanel({
   }, [courseId, set.id]);
 
   useEffect(() => {
-    load();
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    void load();
   }, [load]);
 
   async function handleDelete(q: SampleQuestion) {

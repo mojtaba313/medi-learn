@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
-import { BookOpen, Loader2, Plus, Sparkles, TrendingUp, X } from "lucide-react";
+import { BookOpen, Layers, Loader2, Plus, Sparkles, TrendingUp, X } from "lucide-react";
 import { toast } from "sonner";
 import { AppShell } from "@/components/app-shell";
 import { CourseCard } from "@/components/course-card";
@@ -90,10 +90,18 @@ export function AdminDashboard({
               مدیریت دروس، جزوه‌ها و سوالات
             </p>
           </div>
-          <Button onClick={() => setShowCreate(true)} className="rounded-xl">
-            <Plus className="ml-2" />
-            ایجاد درس جدید
-          </Button>
+          <div className="flex flex-wrap items-center gap-2">
+            <Button asChild variant="outline" className="rounded-xl">
+              <a href="/admin/modules">
+                <Layers className="ml-2 h-4 w-4" />
+                مدیریت ماژول‌ها
+              </a>
+            </Button>
+            <Button onClick={() => setShowCreate(true)} className="rounded-xl">
+              <Plus className="ml-2" />
+              ایجاد درس جدید
+            </Button>
+          </div>
         </div>
 
         <div className="mb-8 grid gap-4 sm:grid-cols-3">

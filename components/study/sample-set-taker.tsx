@@ -18,6 +18,8 @@ import { Badge } from "@/components/ui/badge";
 import { toFa } from "@/lib/utils";
 import { QUESTION_OPTIONS, OPTION_LABELS } from "@/lib/constants";
 
+const currentTime = () => Date.now();
+
 interface Q {
   id: string;
   text: string;
@@ -72,7 +74,7 @@ export function SampleSetTaker({
   const [submitting, setSubmitting] = useState(false);
   const [result, setResult] = useState<Result | null>(null);
   const [deadline, setDeadline] = useState<number | null>(null);
-  const enteredAt = useRef<number>(Date.now());
+  const enteredAt = useRef<number>(0);
 
   const loadQuestions = useCallback(async () => {
     setLoading(true);
@@ -96,7 +98,10 @@ export function SampleSetTaker({
   }, [courseId, setId, mode, onClose]);
 
   useEffect(() => {
-    loadQuestions();
+    const timer = window.setTimeout(() => {
+      void loadQuestions();
+    }, 0);
+    return () => window.clearTimeout(timer);
   }, [loadQuestions]);
 
   const recordTime = useCallback(
@@ -167,7 +172,7 @@ export function SampleSetTaker({
     return () => clearInterval(t);
   }, [deadline, submit]);
 
-  const remaining = deadline ? Math.max(0, Math.floor((deadline - Date.now()) / 1000)) : 0;
+  const remaining = deadline ? Math.max(0, Math.floor((deadline - currentTime()) / 1000)) : 0;
   const fmtTime = (s: number) => {
     const m = Math.floor(s / 60);
     const sec = s % 60;
