@@ -22,13 +22,10 @@ import {
   type TextAnnotation,
   type TextAnnotationColor,
 } from "@/lib/text-annotations";
-import {
-  extractHeadings,
-  highlightHtml,
-  withRootPath,
-} from "@/lib/module-utils";
+import { extractBlockHeadings } from "@/lib/content-blocks";
 import { AnnotationPopover } from "@/components/modules/annotation-popover";
-import type { LessonData } from "@/components/modules/types";
+import { BlockRenderer } from "@/components/modules/block-renderer";
+import type { NoteData } from "@/components/modules/types";
 import type { StudyPrefs } from "@/lib/study-prefs";
 import { cn, toFa } from "@/lib/utils";
 
@@ -47,7 +44,7 @@ const COLOR_CLASSES: Record<TextAnnotationColor, string> = {
 };
 
 interface LessonReaderProps {
-  lesson: LessonData;
+  lesson: NoteData;
   lessonIndex: number;
   total: number;
   isDone: boolean;
@@ -100,11 +97,7 @@ export function LessonReader({
   const [popoverId, setPopoverId] = useState<string | null>(null);
   const [popoverPosition, setPopoverPosition] = useState({ top: 0, left: 0 });
 
-  const headings = useMemo(() => extractHeadings(lesson.html), [lesson.html]);
-  const html = useMemo(() => {
-    const content = withRootPath(lesson.html);
-    return searchQuery ? highlightHtml(content, searchQuery) : content;
-  }, [lesson.html, searchQuery]);
+  const headings = useMemo(() => extractBlockHeadings(lesson.blocks), [lesson.blocks]);
 
   const wordCount = note.trim() ? note.trim().split(/\s+/).length : 0;
   const activeAnnotation = popoverId
@@ -112,11 +105,13 @@ export function LessonReader({
     : null;
 
   useEffect(() => {
-    bodyRef.current?.querySelectorAll("a").forEach((anchor) => {
+    const root = bodyRef.current;
+    if (!root) return;
+    root.querySelectorAll("a").forEach((anchor) => {
       anchor.setAttribute("target", "_blank");
       anchor.setAttribute("rel", "noreferrer");
     });
-  }, [html]);
+  }, []);
 
   useEffect(() => {
     const root = bodyRef.current;
@@ -125,7 +120,7 @@ export function LessonReader({
       heading.id = `section-${index + 1}`;
     });
     if (!searchQuery) applyTextAnnotations(root, annotations);
-  }, [html, annotations, searchQuery]);
+  }, [annotations, searchQuery]);
 
   useEffect(() => {
     const root = bodyRef.current;
@@ -204,8 +199,8 @@ export function LessonReader({
       root.removeEventListener("mouseup", handleMouseUp);
       root.removeEventListener("click", handleClick);
       document.removeEventListener("click", handleDocumentClick);
-      window.removeEventListener("scroll", hideToolbar, true);
-      window.removeEventListener("resize", hideToolbar);
+    window.removeEventListener("scroll", hideToolbar, true);
+    window.removeEventListener("resize", hideToolbar);
     };
   }, [searchQuery]);
 
@@ -230,7 +225,7 @@ export function LessonReader({
     if (!toolbar) return;
     onAddAnnotation({
       id: createTextAnnotationId(),
-      lessonSlug: lesson.slug,
+      lessonSlug: lesson.id,
       color,
       note: "",
       createdAt: annotationTimestamp(),
@@ -339,11 +334,20 @@ export function LessonReader({
           </span>
         </div>
 
-        <div
-          ref={bodyRef}
-          className={cn("lesson-body", fontClass, lineClass)}
-          dangerouslySetInnerHTML={{ __html: html }}
-        />
+        <div ref={bodyRef} className={cn("lesson-body", fontClass, lineClass)}>
+          {lesson.blocks && lesson.blocks.length > 0 ? (
+            <BlockRenderer
+              blocks={lesson.blocks}
+              assets={lesson.assets ?? {}}
+              imageAnnotations={lesson.imageAnnotations ?? {}}
+              onImageAnnotationsChange={() => {}}
+            />
+          ) : (
+            <div className="text-muted-foreground text-center py-12">
+              محتوای این درس در قالب بلوک تعریف نشده است.
+            </div>
+          )}
+        </div>
 
         <section className="mt-8 rounded-2xl border border-border/60 bg-card/70 p-4 sm:p-5">
           <div className="mb-3 flex items-center justify-between gap-3">

@@ -43,8 +43,8 @@ import { Progress } from "@/components/ui/progress";
 import type {
   AttemptData,
   FlashcardData,
-  LessonData,
-  ModuleData,
+  NoteData,
+  NoteMeta,
   QuestionData,
   ResponseData,
   ReviewData,
@@ -93,8 +93,8 @@ const isReviewDue = (review: ReviewData | undefined) =>
   !review || new Date(review.due).getTime() <= Date.now();
 
 interface ModuleStudyProps {
-  module: ModuleData;
-  lessons: LessonData[];
+  module: NoteMeta;
+  lessons: NoteData[];
   questions: QuestionData[];
   flashcards: FlashcardData[];
   initialLessonSlug?: string;
@@ -129,7 +129,7 @@ export function ModuleStudy({
 
   const firstSlug = lessons[0]?.slug ?? "";
   const validInitialSlug =
-    initialLessonSlug && lessons.some((lesson) => lesson.slug === initialLessonSlug)
+    initialLessonSlug && lessons.some((lesson) => lesson.id === initialLessonSlug)
       ? initialLessonSlug
       : firstSlug;
 
@@ -155,12 +155,12 @@ export function ModuleStudy({
   const annotationTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
 
   const activeLesson =
-    lessons.find((lesson) => lesson.slug === activeLessonSlug) ?? lessons[0] ?? null;
+    lessons.find((lesson) => lesson.id === activeLessonSlug) ?? lessons[0] ?? null;
   const activeIndex = activeLesson
-    ? lessons.findIndex((lesson) => lesson.slug === activeLesson.slug)
+    ? lessons.findIndex((lesson) => lesson.id === activeLesson.slug)
     : -1;
 
-  const doneCount = lessons.filter((lesson) => done[lesson.slug]).length;
+  const doneCount = lessons.filter((lesson) => done[lesson.id]).length;
   const progressPercent = lessons.length
     ? Math.round((doneCount / lessons.length) * 100)
     : 0;
@@ -455,7 +455,7 @@ export function ModuleStudy({
     <div className="space-y-4">
       <div className="rounded-2xl border border-border/60 bg-gradient-to-br from-teal-500/10 via-card to-card p-4">
         <div className="mb-1 text-[11px] font-medium text-teal-600 dark:text-teal-400">
-          {module.eyebrow ?? "ماژول مطالعه"}
+          {module.eyebrow ?? "جزوه مطالعه"}
         </div>
         <h2 className="text-lg font-bold leading-7">{module.cardTitle}</h2>
         <p className="mt-1 line-clamp-3 text-xs leading-6 text-muted-foreground">
@@ -546,12 +546,12 @@ export function ModuleStudy({
         </div>
         <div className="max-h-[calc(100vh-430px)] space-y-1 overflow-y-auto pl-1">
           {filteredLessons.map((lesson) => {
-            const isActive = view === "lesson" && lesson.slug === activeLesson?.slug;
+            const isActive = view === "lesson" && lesson.id === activeLesson?.slug;
             return (
               <button
-                key={lesson.slug}
+                key={lesson.id}
                 type="button"
-                onClick={() => openLesson(lesson.slug)}
+                onClick={() => openLesson(lesson.id)}
                 className={cn(
                   "flex w-full items-start gap-2 rounded-xl px-2.5 py-2 text-right text-sm transition-colors",
                   isActive
@@ -559,7 +559,7 @@ export function ModuleStudy({
                     : "text-muted-foreground hover:bg-muted hover:text-foreground",
                 )}
               >
-                {done[lesson.slug] ? (
+                {done[lesson.id] ? (
                   <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-emerald-500" />
                 ) : (
                   <Circle className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground/30" />
@@ -574,7 +574,7 @@ export function ModuleStudy({
                     </span>
                   )}
                 </span>
-                {bookmarks.has(lesson.slug) && (
+                {bookmarks.has(lesson.id) && (
                   <Bookmark className="mt-0.5 h-3.5 w-3.5 shrink-0 text-amber-500" />
                 )}
               </button>
@@ -606,7 +606,7 @@ export function ModuleStudy({
                 type="button"
                 onClick={() => setSidebarOpen(true)}
                 className="rounded-lg border border-border p-1.5 text-muted-foreground hover:bg-muted lg:hidden"
-                aria-label="فهرست ماژول"
+                aria-label="فهرست جزوه"
               >
                 <Menu className="h-4 w-4" />
               </button>
@@ -615,7 +615,7 @@ export function ModuleStudy({
                 className="inline-flex shrink-0 items-center gap-1 text-muted-foreground hover:text-primary"
               >
                 <ArrowRight className="h-4 w-4" />
-                ماژول‌ها
+                جزوه‌ها
               </Link>
               <span className="text-muted-foreground/40">/</span>
               <span className="truncate font-medium">{module.cardTitle}</span>

@@ -3,9 +3,9 @@ import { db } from "@/lib/db";
 import { getSession } from "@/lib/auth";
 import { err, ok } from "@/lib/api";
 
-async function getLesson(id: string, lessonId: string) {
-  return db.lesson.findUnique({
-    where: { moduleId_slug: { moduleId: id, slug: lessonId } },
+async function getNote(noteId: string) {
+  return db.note.findUnique({
+    where: { id: noteId },
     select: { id: true },
   });
 }
@@ -17,13 +17,13 @@ export async function POST(
   const session = await getSession();
   if (!session) return err("دسترسی غیرمجاز", 401);
 
-  const { id, lessonId } = await params;
-  const lesson = await getLesson(id, lessonId);
-  if (!lesson) return err("درس پیدا نشد", 404);
+  const { lessonId: noteId } = await params;
+  const note = await getNote(noteId);
+  if (!note) return err("نوت پیدا نشد", 404);
 
   await db.bookmark.upsert({
-    where: { userId_lessonId: { userId: session.userId, lessonId: lesson.id } },
-    create: { userId: session.userId, lessonId: lesson.id },
+    where: { userId_noteId: { userId: session.userId, noteId: note.id } },
+    create: { userId: session.userId, noteId: note.id },
     update: {},
   });
 
@@ -37,12 +37,12 @@ export async function DELETE(
   const session = await getSession();
   if (!session) return err("دسترسی غیرمجاز", 401);
 
-  const { id, lessonId } = await params;
-  const lesson = await getLesson(id, lessonId);
-  if (!lesson) return err("درس پیدا نشد", 404);
+  const { lessonId: noteId } = await params;
+  const note = await getNote(noteId);
+  if (!note) return err("نوت پیدا نشد", 404);
 
   await db.bookmark.deleteMany({
-    where: { userId: session.userId, lessonId: lesson.id },
+    where: { userId: session.userId, noteId: note.id },
   });
 
   return ok({ bookmarked: false });

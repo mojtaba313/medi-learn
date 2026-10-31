@@ -1,7 +1,7 @@
 "use client";
 
 import { Bookmark, BookmarkX, ChevronLeft } from "lucide-react";
-import type { LessonData } from "@/components/modules/types";
+import type { NoteData } from "@/components/modules/types";
 import { toFa } from "@/lib/utils";
 
 export function ModuleBookmarks({
@@ -10,15 +10,15 @@ export function ModuleBookmarks({
   onOpenLesson,
   onRemove,
 }: {
-  lessons: LessonData[];
+  lessons: NoteData[];
   bookmarks: string[];
-  onOpenLesson: (slug: string) => void;
-  onRemove: (slug: string) => void;
+  onOpenLesson: (id: string) => void;
+  onRemove: (id: string) => void;
 }) {
-  const lessonBySlug = new Map(lessons.map((lesson) => [lesson.slug, lesson]));
+  const lessonBySlug = new Map(lessons.map((lesson) => [lesson.id, lesson]));
   const entries = bookmarks
-    .map((slug) => lessonBySlug.get(slug))
-    .filter((lesson): lesson is LessonData => Boolean(lesson));
+    .map((id) => lessonBySlug.get(id))
+    .filter((lesson): lesson is NoteData => Boolean(lesson));
 
   return (
     <section className="mx-auto w-full max-w-3xl">
@@ -41,16 +41,16 @@ export function ModuleBookmarks({
         <div className="space-y-3">
           {entries.map((lesson) => (
             <div
-              key={lesson.slug}
+              key={lesson.id}
               className="flex items-center justify-between gap-3 rounded-2xl border border-border/60 bg-card/70 p-4"
             >
               <div className="min-w-0">
                 <div className="mb-1 text-xs text-muted-foreground">
-                  بخش {toFa(lessons.findIndex((item) => item.slug === lesson.slug) + 1)}
+                  بخش {toFa(lessons.findIndex((item) => item.id === lesson.id) + 1)}
                 </div>
                 <button
                   type="button"
-                  onClick={() => onOpenLesson(lesson.slug)}
+                  onClick={() => onOpenLesson(lesson.id)}
                   className="truncate text-right font-semibold hover:text-primary"
                 >
                   {lesson.title}
@@ -59,7 +59,7 @@ export function ModuleBookmarks({
               <div className="flex shrink-0 items-center gap-1">
                 <button
                   type="button"
-                  onClick={() => onRemove(lesson.slug)}
+                  onClick={() => onRemove(lesson.id)}
                   className="rounded-lg p-2 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
                   title="حذف نشان"
                 >
@@ -67,7 +67,7 @@ export function ModuleBookmarks({
                 </button>
                 <button
                   type="button"
-                  onClick={() => onOpenLesson(lesson.slug)}
+                  onClick={() => onOpenLesson(lesson.id)}
                   className="inline-flex items-center gap-1 rounded-lg bg-primary/10 px-3 py-2 text-xs font-medium text-primary hover:bg-primary/20"
                 >
                   مطالعه

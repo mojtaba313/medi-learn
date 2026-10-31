@@ -6,58 +6,60 @@ import type {
   AttemptAnswer,
   AttemptData,
   GalleryData,
-  ModuleData,
+  NoteMeta,
   ReviewData,
 } from "@/components/modules/types";
 import type {
   TextAnnotation,
   TextAnnotationColor,
 } from "@/lib/text-annotations";
+import type { AnnotationData } from "@/lib/annotations";
+import { extractBlockHeadings, splitBlocksByHeadings, type ContentBlock } from "@/lib/content-blocks";
 
-export const metadata = { title: "مطالعه ماژول" };
+export const metadata = { title: "مطالعه نوت" };
 
 export default async function ModulePage({
   params,
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ lesson?: string; view?: string }>;
+  searchParams: Promise<{ note?: string; view?: string }>;
 }) {
   const user = await requireAuth();
   const { id } = await params;
-  const { lesson: lessonParam, view } = await searchParams;
+  const { note: noteParam, view } = await searchParams;
 
-  const moduleRecord = await db.module.findUnique({
+  const noteRecord = await db.note.findUnique({
     where: { id },
     include: {
-      lessons: { orderBy: { order: "asc" } },
+      assets: true,
       questions: { orderBy: { order: "asc" } },
       flashcards: { orderBy: { order: "asc" } },
     },
   });
 
-  if (!moduleRecord) notFound();
+  if (!noteRecord) notFound();
 
   const [progressRows, noteRows, annotationRows, bookmarkRows, reviewRows, attempts, responses] =
     await Promise.all([
-      db.lessonProgress.findMany({
-        where: { userId: user.id, lesson: { moduleId: id } },
-        select: { lessonId: true, done: true },
+      db.noteProgress.findMany({
+        where: { userId: user.id, noteId: id },
+        select: { noteId: true, done: true },
       }),
-      db.lessonNote.findMany({
-        where: { userId: user.id, lesson: { moduleId: id } },
-        select: { lessonId: true, text: true },
+      db.noteNote.findMany({
+        where: { userId: user.id, noteId: id },
+        select: { noteId: true, text: true },
       }),
-      db.lessonAnnotation.findMany({
-        where: { userId: user.id, lesson: { moduleId: id } },
+      db.textAnnotation.findMany({
+        where: { userId: user.id, noteId: id },
         orderBy: { createdAt: "asc" },
       }),
       db.bookmark.findMany({
-        where: { userId: user.id, lesson: { moduleId: id } },
-        select: { lessonId: true },
+        where: { userId: user.id, noteId: id },
+        select: { noteId: true },
       }),
       db.flashcardReview.findMany({
-        where: { userId: user.id, card: { moduleId: id } },
+        where: { userId: user.id, card: { noteId: id } },
         select: {
           cardId: true,
           interval: true,
@@ -68,53 +70,49 @@ export default async function ModulePage({
           last: true,
         },
       }),
-      db.moduleQuizAttempt.findMany({
-        where: { userId: user.id, moduleId: id },
+      db.noteQuizAttempt.findMany({
+        where: { userId: user.id, noteId: id },
         orderBy: { createdAt: "desc" },
         take: 30,
       }),
-      db.moduleQuestionResponse.findMany({
-        where: { userId: user.id, question: { moduleId: id } },
+      db.noteQuestionResponse.findMany({
+        where: { userId: user.id, question: { noteId: id } },
         select: { questionId: true, selectedOption: true, isCorrect: true },
       }),
     ]);
 
-  const slugById = new Map(moduleRecord.lessons.map((item) => [item.id, item.slug]));
+  const lessons = splitBlocksByHeadings(
+    (noteRecord.blocks as unknown as ContentBlock[]) ?? [],
+    noteRecord.id,
+    noteRecord.title,
+  );
 
   const initialProgress: Record<string, boolean> = {};
   for (const row of progressRows) {
-    const slug = slugById.get(row.lessonId);
-    if (slug) initialProgress[slug] = row.done;
+    initialProgress[row.noteId] = row.done;
   }
 
   const initialNotes: Record<string, string> = {};
   for (const row of noteRows) {
-    const slug = slugById.get(row.lessonId);
-    if (slug) initialNotes[slug] = row.text;
+    initialNotes[row.noteId] = row.text;
   }
 
-  const initialAnnotations: TextAnnotation[] = annotationRows.flatMap((row) => {
-    const lessonSlug = slugById.get(row.lessonId);
-    if (!lessonSlug) return [];
-    return [
-      {
-        id: row.id,
-        lessonSlug,
-        color: row.color as TextAnnotationColor,
-        note: row.note ?? "",
-        quote: row.quote,
-        startPath: row.startPath,
-        startOffset: row.startOffset,
-        endPath: row.endPath,
-        endOffset: row.endOffset,
-        createdAt: row.createdAt.getTime(),
-      },
-    ];
-  });
+  const initialAnnotations: TextAnnotation[] = annotationRows.map((row) => ({
+    id: row.id,
+    lessonSlug: noteRecord.slug,
+    color: row.color as TextAnnotationColor,
+    note: row.content ?? "",
+    quote: row.quote,
+    startPath: row.startPath,
+    startOffset: row.startOffset,
+    endPath: row.endPath,
+    endOffset: row.endOffset,
+    createdAt: row.createdAt.getTime(),
+  }));
 
   const initialBookmarks = bookmarkRows
-    .map((row) => slugById.get(row.lessonId))
-    .filter((slug): slug is string => Boolean(slug));
+    .map((row) => row.noteId)
+    .filter((noteId): noteId is string => Boolean(noteId));
 
   const initialReviews: Record<string, ReviewData> = {};
   for (const row of reviewRows) {
@@ -154,28 +152,38 @@ export default async function ModulePage({
     };
   }
 
-  const moduleData: ModuleData = {
-    id: moduleRecord.id,
-    title: moduleRecord.title,
-    cardTitle: moduleRecord.cardTitle,
-    cardDescription: moduleRecord.cardDescription,
-    eyebrow: moduleRecord.eyebrow,
-    description: moduleRecord.description,
-    pills: moduleRecord.pills,
-    footer: moduleRecord.footer,
-    gallery: (moduleRecord.gallery as unknown as GalleryData | null) ?? null,
-    referencesTitle: moduleRecord.referencesTitle,
-    referencesIntro: moduleRecord.referencesIntro,
-    referencesHtml: moduleRecord.referencesHtml,
-    quizTitle: moduleRecord.quizTitle,
-    quizDescription: moduleRecord.quizDescription,
-    quizNavLabel: moduleRecord.quizNavLabel,
+  const assetsById: Record<string, { url: string; width?: number; height?: number }> = {};
+  for (const asset of noteRecord.assets ?? []) {
+    assetsById[asset.assetId] = {
+      url: `/api/modules/${encodeURIComponent(noteRecord.id)}/assets/${encodeURIComponent(asset.assetId)}/image`,
+      width: asset.width ?? undefined,
+      height: asset.height ?? undefined,
+    };
+  }
+
+  const moduleData: NoteMeta = {
+    id: noteRecord.id,
+    title: noteRecord.title,
+    cardTitle: noteRecord.cardTitle,
+    cardDescription: noteRecord.cardDescription,
+    eyebrow: noteRecord.eyebrow,
+    description: noteRecord.description,
+    pills: noteRecord.pills,
+    footer: noteRecord.footer,
+    gallery: (noteRecord.gallery as unknown as GalleryData | null) ?? null,
+    referencesTitle: noteRecord.referencesTitle,
+    referencesIntro: noteRecord.referencesIntro,
+    referencesHtml: noteRecord.referencesHtml,
+    quizTitle: noteRecord.quizTitle,
+    quizDescription: noteRecord.quizDescription,
+    quizNavLabel: noteRecord.quizNavLabel,
+    assets: noteRecord.assets,
   };
 
   return (
     <ModuleStudy
       module={moduleData}
-      lessons={moduleRecord.lessons.map((item) => ({
+      lessons={lessons.map((item) => ({
         id: item.id,
         slug: item.slug,
         order: item.order,
@@ -184,8 +192,12 @@ export default async function ModulePage({
         source: item.source,
         summary: item.summary,
         html: item.html,
+        blocks: item.blocks,
+        searchText: item.searchText ?? null,
+        assets: assetsById,
+        imageAnnotations: item.imageAnnotations,
       }))}
-      questions={moduleRecord.questions.map((item) => ({
+      questions={noteRecord.questions.map((item) => ({
         id: item.id,
         order: item.order,
         text: item.text,
@@ -197,13 +209,13 @@ export default async function ModulePage({
         explanation: item.explanation,
         topic: item.topic,
       }))}
-      flashcards={moduleRecord.flashcards.map((item) => ({
+      flashcards={noteRecord.flashcards.map((item) => ({
         id: item.id,
         order: item.order,
         term: item.term,
         definition: item.definition,
       }))}
-      initialLessonSlug={lessonParam}
+      initialLessonSlug={noteParam}
       initialView={view}
       initialProgress={initialProgress}
       initialNotes={initialNotes}

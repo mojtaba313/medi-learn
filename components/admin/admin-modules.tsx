@@ -91,6 +91,14 @@ export function AdminModules({
       return;
     }
 
+    const jsonFiles = files.filter((file) => file.type === "application/json" || file.name.endsWith(".json"));
+    const assetFiles = files.filter((file) => !(file.type === "application/json" || file.name.endsWith(".json")));
+
+    if (!jsonFiles.length) {
+      setError("فایل جزوه (module.json) پیدا نشد.");
+      return;
+    }
+
     setUploading(true);
     setError("");
 
@@ -98,7 +106,7 @@ export function AdminModules({
       let moduleData: ModuleJson | null = null;
       const lessons: LessonJson[] = [];
 
-      for (const file of files) {
+      for (const file of jsonFiles) {
         const text = await file.text();
         let parsed: unknown;
         try {
@@ -130,24 +138,29 @@ export function AdminModules({
         }
       }
 
-      if (!moduleData) throw new Error("فایل ماژول (module.json) پیدا نشد.");
+      if (!moduleData) throw new Error("فایل جزوه (module.json) پیدا نشد.");
       if (!lessons.length) throw new Error("هیچ فایل درسی پیدا نشد.");
+
+      const form = new FormData();
+      form.set("payload", JSON.stringify({ module: moduleData, lessons }));
+      for (const file of assetFiles) {
+        form.append("assets", file);
+      }
 
       const res = await fetch("/api/modules/import", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ module: moduleData, lessons }),
+        body: form,
       });
       const data = await res.json().catch(() => null);
 
       if (!res.ok) {
-        throw new Error(data?.error ?? "وارد کردن ماژول انجام نشد.");
+        throw new Error(data?.error ?? "وارد کردن جزوه انجام نشد.");
       }
 
       toast.success(
-        `ماژول «${moduleData.title}» وارد شد: ${toFa(data.counts.lessons)} درس، ${toFa(
+        `جزوه «${moduleData.title}» وارد شد: ${toFa(data.counts.lessons)} درس، ${toFa(
           data.counts.questions,
-        )} سوال، ${toFa(data.counts.flashcards)} فلش‌کارت`,
+        )} سوال، ${toFa(data.counts.flashcards)} فلش‌کارت${data.counts.assets ? `، ${toFa(data.counts.assets)} دارایی` : ""}`,
       );
       setFiles([]);
       if (inputRef.current) inputRef.current.value = "";
@@ -168,9 +181,9 @@ export function AdminModules({
               <BookOpen className="h-3.5 w-3.5" />
               مدیریت محتوا
             </div>
-            <h1 className="text-2xl font-bold sm:text-3xl">ماژول‌های مطالعه</h1>
+            <h1 className="text-2xl font-bold sm:text-3xl">جزوه‌های مطالعه</h1>
             <p className="mt-1 text-muted-foreground">
-              ماژول‌های JSON و درس‌های آن‌ها را وارد یا به‌روزرسانی کنید.
+              جزوه‌های JSON و درس‌های آن‌ها را وارد یا به‌روزرسانی کنید.
             </p>
           </div>
           <Button asChild variant="outline" className="rounded-xl">
@@ -185,14 +198,14 @@ export function AdminModules({
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-base">
               <Upload className="h-4 w-4 text-teal-500" />
-              وارد کردن ماژول
+              وارد کردن جزوه
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             <p className="text-sm leading-7 text-muted-foreground">
               فایل <code className="rounded bg-muted px-1">module.json</code> و همهٔ
               فایل‌های درس (مثل <code className="rounded bg-muted px-1">01-*.json</code>)
-              را یکجا انتخاب کنید. اگر فایل ماژول شامل آرایهٔ{" "}
+              را یکجا انتخاب کنید. اگر فایل جزوه شامل آرایهٔ{" "}
               <code className="rounded bg-muted px-1">lessons</code> باشد، فقط همان یک
               فایل کافی است.
             </p>
@@ -210,12 +223,12 @@ export function AdminModules({
                 فایل‌ها را اینجا رها کنید یا کلیک کنید
               </span>
               <span className="mt-1 text-xs text-muted-foreground">
-                فقط فایل‌های JSON
+                فایل‌های JSON و دارایی (تصویر/پیدیاف)
               </span>
               <input
                 ref={inputRef}
                 type="file"
-                accept="application/json,.json"
+                accept="application/json,.json,.jpg,.jpeg,.png,.webp,.gif,.pdf"
                 multiple
                 className="hidden"
                 onChange={(event) => addFiles(event.target.files)}
@@ -257,7 +270,7 @@ export function AdminModules({
                 ) : (
                   <Upload className="ml-2 h-4 w-4" />
                 )}
-                {uploading ? "در حال وارد کردن…" : "وارد کردن ماژول"}
+                {uploading ? "در حال وارد کردن…" : "وارد کردن جزوه"}
               </Button>
               {files.length > 0 && (
                 <Button
@@ -277,15 +290,15 @@ export function AdminModules({
         </Card>
 
         <div className="mb-4 flex items-center justify-between">
-          <h2 className="text-lg font-semibold">ماژول‌های موجود</h2>
+          <h2 className="text-lg font-semibold">جزوه‌های موجود</h2>
           <span className="text-xs text-muted-foreground">
-            {toFa(initialModules.length)} ماژول
+            {toFa(initialModules.length)} جزوه
           </span>
         </div>
 
         {initialModules.length === 0 ? (
           <div className="rounded-2xl border border-dashed border-border py-16 text-center text-muted-foreground">
-            هنوز ماژولی وارد نشده است.
+            هنوز جزوهی وارد نشده است.
           </div>
         ) : (
           <div className="grid gap-4 md:grid-cols-2">
@@ -321,7 +334,7 @@ export function AdminModules({
                       href={`/modules/${module.id}`}
                       className="inline-flex items-center gap-1 rounded-xl bg-primary/10 px-3 py-1.5 text-xs font-medium text-primary hover:bg-primary/20"
                     >
-                      مشاهده ماژول
+                      مشاهده جزوه
                       <ArrowLeft className="h-3.5 w-3.5" />
                     </Link>
                   </div>

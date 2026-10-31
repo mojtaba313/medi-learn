@@ -1,4 +1,8 @@
-export interface LessonData {
+import type { NoteAsset } from "@prisma/client";
+import type { ContentBlock } from "@/lib/content-blocks";
+import type { AnnotationData, AnnotationElement } from "@/lib/annotations";
+
+export interface NoteData {
   id: string;
   slug: string;
   order: number;
@@ -7,6 +11,29 @@ export interface LessonData {
   source: string | null;
   summary: string | null;
   html: string;
+  blocks: ContentBlock[];
+  searchText: string | null;
+  assets: Record<string, { url: string; width?: number; height?: number }>;
+  imageAnnotations: Record<string, AnnotationElement[]>;
+}
+
+export interface NoteMeta {
+  id: string;
+  title: string;
+  cardTitle: string;
+  cardDescription: string | null;
+  eyebrow: string | null;
+  description: string;
+  pills: string[];
+  footer: string | null;
+  gallery: GalleryData | null;
+  referencesTitle: string | null;
+  referencesIntro: string | null;
+  referencesHtml: string | null;
+  quizTitle: string | null;
+  quizDescription: string | null;
+  quizNavLabel: string | null;
+  assets: NoteAsset[];
 }
 
 export interface GalleryCollection {
@@ -23,24 +50,6 @@ export interface GalleryData {
   intro: string;
   callout?: string;
   collections: GalleryCollection[];
-}
-
-export interface ModuleData {
-  id: string;
-  title: string;
-  cardTitle: string;
-  cardDescription: string | null;
-  eyebrow: string | null;
-  description: string;
-  pills: string[];
-  footer: string | null;
-  gallery: GalleryData | null;
-  referencesTitle: string | null;
-  referencesIntro: string | null;
-  referencesHtml: string | null;
-  quizTitle: string | null;
-  quizDescription: string | null;
-  quizNavLabel: string | null;
 }
 
 export interface QuestionData {

@@ -18,9 +18,9 @@ const schema = z.object({
   annotations: z.array(annotationSchema).max(2_000),
 });
 
-async function getLesson(id: string, lessonId: string) {
-  return db.lesson.findUnique({
-    where: { moduleId_slug: { moduleId: id, slug: lessonId } },
+async function getNote(noteId: string) {
+  return db.note.findUnique({
+    where: { id: noteId },
     select: { id: true },
   });
 }
@@ -32,12 +32,12 @@ export async function GET(
   const session = await getSession();
   if (!session) return err("دسترسی غیرمجاز", 401);
 
-  const { id, lessonId } = await params;
-  const lesson = await getLesson(id, lessonId);
-  if (!lesson) return err("درس پیدا نشد", 404);
+  const { lessonId: noteId } = await params;
+  const note = await getNote(noteId);
+  if (!note) return err("نوت پیدا نشد", 404);
 
-  const annotations = await db.lessonAnnotation.findMany({
-    where: { userId: session.userId, lessonId: lesson.id },
+  const annotations = await db.textAnnotation.findMany({
+    where: { userId: session.userId, noteId: note.id },
     orderBy: { createdAt: "asc" },
   });
 
@@ -51,25 +51,26 @@ export async function PUT(
   const session = await getSession();
   if (!session) return err("دسترسی غیرمجاز", 401);
 
-  const { id, lessonId } = await params;
-  const lesson = await getLesson(id, lessonId);
-  if (!lesson) return err("درس پیدا نشد", 404);
+  const { lessonId: noteId } = await params;
+  const note = await getNote(noteId);
+  if (!note) return err("نوت پیدا نشد", 404);
 
   const body = await readJson<unknown>(request);
   const parsed = schema.safeParse(body);
   if (!parsed.success) return err("داده نامعتبر", 422);
 
   await db.$transaction(async (tx) => {
-    await tx.lessonAnnotation.deleteMany({
-      where: { userId: session.userId, lessonId: lesson.id },
+    await tx.textAnnotation.deleteMany({
+      where: { userId: session.userId, noteId: note.id },
     });
     if (parsed.data.annotations.length > 0) {
-      await tx.lessonAnnotation.createMany({
+      await tx.textAnnotation.createMany({
         data: parsed.data.annotations.map((annotation) => ({
           userId: session.userId,
-          lessonId: lesson.id,
+          noteId: note.id,
+          blockId: annotation.startPath.join("-"),
           color: annotation.color,
-          note: annotation.note,
+          content: annotation.note,
           quote: annotation.quote,
           startPath: annotation.startPath,
           startOffset: annotation.startOffset,
@@ -80,8 +81,8 @@ export async function PUT(
     }
   });
 
-  const annotations = await db.lessonAnnotation.findMany({
-    where: { userId: session.userId, lessonId: lesson.id },
+  const annotations = await db.textAnnotation.findMany({
+    where: { userId: session.userId, noteId: note.id },
     orderBy: { createdAt: "asc" },
   });
 

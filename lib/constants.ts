@@ -3,7 +3,7 @@ import type { AnnotationElement } from "@/lib/annotations";
 export const APP_NAME = "مدی‌لرن";
 export const APP_TAGLINE = "پلتفرم یادگیری هوشمند پزشکی";
 
-export const COURSE_CATEGORIES = [
+export const NOTE_CATEGORIES = [
   "آناتومی",
   "فیزیولوژی",
   "پاتولوژی",

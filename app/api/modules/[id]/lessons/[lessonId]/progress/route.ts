@@ -16,22 +16,22 @@ export async function POST(
   const session = await getSession();
   if (!session) return err("دسترسی غیرمجاز", 401);
 
-  const { id, lessonId } = await params;
-  const lesson = await db.lesson.findUnique({
-    where: { moduleId_slug: { moduleId: id, slug: lessonId } },
+  const { lessonId: noteId } = await params;
+  const note = await db.note.findUnique({
+    where: { id: noteId },
     select: { id: true },
   });
-  if (!lesson) return err("درس پیدا نشد", 404);
+  if (!note) return err("نوت پیدا نشد", 404);
 
   const body = await readJson<unknown>(request);
   const parsed = schema.safeParse(body ?? {});
   if (!parsed.success) return err("داده نامعتبر", 422);
 
-  const progress = await db.lessonProgress.upsert({
-    where: { userId_lessonId: { userId: session.userId, lessonId: lesson.id } },
+  const progress = await db.noteProgress.upsert({
+    where: { userId_noteId: { userId: session.userId, noteId: note.id } },
     create: {
       userId: session.userId,
-      lessonId: lesson.id,
+      noteId: note.id,
       done: parsed.data.done ?? false,
       lastOpenedAt: parsed.data.opened ? new Date() : null,
     },

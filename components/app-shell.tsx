@@ -6,7 +6,6 @@ import { usePathname } from "next/navigation";
 import { Activity, BookOpen, Heart, LayoutDashboard, Library, LogOut, Search, Shield, Stethoscope, User } from "lucide-react";
 import { useAuth } from "@/components/auth-provider";
 import { ThemeToggle } from "@/components/theme-toggle";
-import { FocusTimer } from "@/components/study/focus-timer";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -44,7 +43,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             {user ? (
               <>
                 <NavLink href="/dashboard" icon={LayoutDashboard} label="داشبورد" />
-                <NavLink href="/modules" icon={Library} label="ماژول‌ها" />
+                <NavLink href="/modules" icon={Library} label="جزوه‌ها" />
                 <NavLink href="/search" icon={Search} label="جستجو" />
                 {user.role === "ADMIN" && (
                   <NavLink href="/admin" icon={Shield} label="پنل مدیریت" />
@@ -86,7 +85,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                   <DropdownMenuItem asChild>
                     <Link href="/modules">
                       <Library className="ml-2 h-4 w-4" />
-                      ماژول‌های مطالعه
+                      جزوه‌های مطالعه
                     </Link>
                   </DropdownMenuItem>
                   <DropdownMenuItem asChild>
@@ -119,7 +118,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </div>
       </header>
       {children}
-      {user && <FocusTimer />}
       <footer className="border-t border-border/60 py-6">
         <div className="mx-auto flex max-w-7xl flex-col items-center justify-between gap-3 px-4 text-sm text-muted-foreground sm:flex-row">
           <div className="flex items-center gap-2">

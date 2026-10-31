@@ -5,7 +5,6 @@ import { AnimatePresence, motion } from "motion/react";
 import { BookOpen, Layers, Loader2, Plus, Sparkles, TrendingUp, X } from "lucide-react";
 import { toast } from "sonner";
 import { AppShell } from "@/components/app-shell";
-import { CourseCard } from "@/components/course-card";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -20,65 +19,43 @@ import {
 } from "@/components/ui/select";
 import { Progress } from "@/components/ui/progress";
 import { toFa } from "@/lib/utils";
-import { COURSE_CATEGORIES } from "@/lib/constants";
+import { NOTE_CATEGORIES } from "@/lib/constants";
 
-interface AdminCourse {
+interface AdminNote {
   id: string;
   title: string;
+  cardTitle: string;
   description: string;
-  category: string;
-  coverUrl: string | null;
-  status: string;
-  error: string | null;
-  totalPages: number;
-  _count: { pages: number; questions: number };
+  category?: string;
+  kind: string;
+  order: number;
+  _count: { questions: number; flashcards: number; assets: number };
 }
 
 export function AdminDashboard({
-  initialCourses,
+  initialNotes,
 }: {
-  initialCourses: AdminCourse[];
+  initialNotes: AdminNote[];
 }) {
-  const [courses, setCourses] = useState<AdminCourse[]>(initialCourses);
+  const [notes, setNotes] = useState<AdminNote[]>(initialNotes);
   const [showCreate, setShowCreate] = useState(false);
-  const [pollingId, setPollingId] = useState<string | null>(null);
 
-  useEffect(() => {
-    if (!pollingId) return;
-    const interval = setInterval(async () => {
-      try {
-        const res = await fetch("/api/courses", { cache: "no-store" });
-        const data = await res.json();
-        const course = data.courses.find(
-          (c: AdminCourse) => c.id === pollingId,
-        );
-        if (course && course.status !== "PROCESSING") {
-          setCourses(data.courses);
-          setPollingId(null);
-          if (course.status === "READY") {
-            toast.success(
-              `درس «${course.title}» با ${toFa(course.totalPages)} صفحه آماده شد ✨`,
-            );
-          } else {
-            toast.error(course.error ?? "پردازش درس ناموفق بود");
-          }
-        }
-      } catch {
-        /* keep polling */
-      }
-    }, 4000);
-    return () => clearInterval(interval);
-  }, [pollingId]);
-
-  const totalPages = courses.reduce(
-    (s, c) => s + (c.totalPages || c._count?.pages || 0),
+  const totalAssets = notes.reduce(
+    (s, n) => s + (n._count?.assets || 0),
     0,
   );
-  const totalQuestions = courses.reduce(
-    (s, c) => s + (c._count?.questions || 0),
+  const totalQuestions = notes.reduce(
+    (s, n) => s + (n._count?.questions || 0),
     0,
   );
-  const readyCourses = courses.filter((c) => c.status === "READY").length;
+  const totalFlashcards = notes.reduce(
+    (s, n) => s + (n._count?.flashcards || 0),
+    0,
+  );
+  const totalBlocks = notes.reduce(
+    (s, n) => s + (n._count?.assets || 0),
+    0,
+  );
 
   return (
     <AppShell>
@@ -87,81 +64,73 @@ export function AdminDashboard({
           <div>
             <h1 className="text-2xl font-bold sm:text-3xl">پنل مدیریت</h1>
             <p className="mt-1 text-muted-foreground">
-              مدیریت دروس، جزوه‌ها و سوالات
+              مدیریت جزوه‌ها، سوالات و فلش‌کارت‌ها
             </p>
           </div>
-          <div className="flex flex-wrap items-center gap-2">
-            <Button asChild variant="outline" className="rounded-xl">
-              <a href="/admin/modules">
-                <Layers className="ml-2 h-4 w-4" />
-                مدیریت ماژول‌ها
-              </a>
-            </Button>
-            <Button onClick={() => setShowCreate(true)} className="rounded-xl">
-              <Plus className="ml-2" />
-              ایجاد درس جدید
-            </Button>
-          </div>
+          <Button onClick={() => setShowCreate(true)} className="rounded-xl">
+            <Plus className="ml-2" />
+            ایجاد جزوه جدید
+          </Button>
         </div>
 
         <div className="mb-8 grid gap-4 sm:grid-cols-3">
           <StatsCard
             icon={BookOpen}
-            label="دروس"
-            value={toFa(readyCourses)}
-            sub={`از ${toFa(courses.length)} درس`}
+            label="جزوه‌ها"
+            value={toFa(notes.length)}
           />
           <StatsCard
             icon={Sparkles}
-            label="صفحات جزوه"
-            value={toFa(totalPages)}
-            sub="صفحه پردازش‌شده"
+            label="دارایی‌ها"
+            value={toFa(
+              notes.reduce((s, n) => s + (n._count?.assets || 0), 0),
+            )}
           />
           <StatsCard
             icon={TrendingUp}
             label="سوالات"
-            value={toFa(totalQuestions)}
-            sub="سوال طراحی‌شده"
+            value={toFa(
+              notes.reduce((s, n) => s + (n._count?.questions || 0), 0),
+            )}
           />
         </div>
 
         <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-          {courses.length === 0 && (
+          {notes.length === 0 && (
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               className="col-span-full flex flex-col items-center justify-center rounded-2xl border border-dashed border-border py-20 text-center"
             >
               <BookOpen className="mb-4 h-12 w-12 text-muted-foreground/50" />
-              <h3 className="mb-2 font-semibold">هنوز درسی ندارید</h3>
+              <h3 className="mb-2 font-semibold">هنوز جزوه‌ای ندارید</h3>
               <p className="mb-6 max-w-sm text-sm text-muted-foreground">
-                اولین درس خود را بسازید و جزوه PDF خود را بارگذاری کنید.
+                اولین جزوه خود را بسازید و محتوای خود را آپلود کنید.
               </p>
               <Button
                 onClick={() => setShowCreate(true)}
                 className="rounded-xl"
               >
                 <Plus className="ml-2" />
-                ایجاد درس جدید
+                ایجاد جزوه جدید
               </Button>
             </motion.div>
           )}
           <AnimatePresence>
-            {courses.map((course, i) => (
-              <div key={course.id} className="relative">
-                <CourseCard
+            {notes.map((note, i) => (
+              <div key={note.id} className="relative">
+                <NoteCard
                   index={i}
-                  course={{
-                    id: course.id,
-                    title: course.title,
-                    description: course.description,
-                    category: course.category,
-                    coverUrl: course.coverUrl,
-                    totalPages: course.totalPages || course._count?.pages || 0,
-                    questionCount: course._count?.questions || 0,
-                    status: course.status,
-                    error: course.error,
-                    href: `/admin/course/${course.id}`,
+                  note={{
+                    id: note.id,
+                    title: note.title,
+                    description: note.description,
+                    kind: note.kind,
+                    order: note.order,
+                    assetCount: note._count?.assets || 0,
+                    questionCount: note._count?.questions || 0,
+                    flashcardCount: note._count?.flashcards || 0,
+                    href: `/admin/modules/${note.id}`,
                   }}
                 />
               </div>
@@ -171,11 +140,10 @@ export function AdminDashboard({
 
         <AnimatePresence>
           {showCreate && (
-            <CreateCourseDialog
+            <CreateNoteDialog
               onClose={() => setShowCreate(false)}
-              onCreated={(course) => {
-                setCourses((prev) => [course, ...prev]);
-                setPollingId(course.id);
+              onCreated={(note) => {
+                setNotes((prev) => [note, ...prev]);
                 setShowCreate(false);
               }}
             />
@@ -195,7 +163,7 @@ function StatsCard({
   icon: typeof BookOpen;
   label: string;
   value: string;
-  sub: string;
+  sub?: string;
 }) {
   return (
     <Card className="border-border/60">
@@ -206,24 +174,109 @@ function StatsCard({
         <div>
           <p className="text-xs text-muted-foreground">{label}</p>
           <p className="text-2xl font-bold">{value}</p>
-          <p className="text-xs text-muted-foreground">{sub}</p>
+          {sub && <p className="text-xs text-muted-foreground">{sub}</p>}
         </div>
       </CardContent>
     </Card>
   );
 }
 
-function CreateCourseDialog({
+function NoteCard({
+  index,
+  note,
+}: {
+  index: number;
+  note: {
+    id: string;
+    title: string;
+    description: string;
+    kind: string;
+    order: number;
+    assetCount: number;
+    questionCount: number;
+    flashcardCount: number;
+    href: string;
+  };
+}) {
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, scale: 0.95 }}
+      transition={{ delay: index * 0.08 }}
+    >
+      <a
+        href={note.href}
+        className="group flex flex-col h-full rounded-2xl border border-border/60 bg-card/60 p-5 shadow-sm transition-all hover:border-teal-500/40 hover:shadow-lg"
+      >
+        <div className="mb-3 flex flex-wrap items-center gap-2">
+          <Badge variant="secondary">جزوه {note.order}</Badge>
+          <Badge variant="outline">{note.kind}</Badge>
+        </div>
+        <h3 className="mb-2 text-lg font-bold group-hover:text-teal-600">{note.title}</h3>
+        <p className="mb-4 line-clamp-2 text-sm text-muted-foreground">{note.description}</p>
+        <div className="mb-4 flex flex-wrap items-center gap-4 text-xs text-muted-foreground">
+          <span className="flex items-center gap-1">
+            <span className="h-4 w-4" />
+            {note.assetCount} دارایی
+          </span>
+          <span className="flex items-center gap-1">
+            <span className="h-4 w-4" />
+            {note.questionCount} سوال
+          </span>
+          <span className="flex items-center gap-1">
+            <span className="h-4 w-4" />
+            {note.flashcardCount} فلش‌کارت
+          </span>
+        </div>
+        <span className="inline-flex items-center gap-1.5 text-sm font-medium text-teal-600 group-hover:underline">
+          ویرایش جزوه
+          <Layers className="h-4 w-4" />
+        </span>
+      </a>
+    </motion.div>
+  );
+}
+
+function Badge({
+  children,
+  variant = "secondary",
+}: {
+  children: React.ReactNode;
+  variant?: "secondary" | "outline";
+}) {
+  return (
+    <span
+      className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${
+        variant === "secondary"
+          ? "bg-teal-500/10 text-teal-600 dark:text-teal-400"
+          : "border border-border text-muted-foreground"
+      }`}
+    >
+      {children}
+    </span>
+  );
+}
+
+function CreateNoteDialog({
   onClose,
   onCreated,
 }: {
   onClose: () => void;
-  onCreated: (course: AdminCourse) => void;
+  onCreated: (note: {
+    id: string;
+    title: string;
+    cardTitle: string;
+    description: string;
+    kind: string;
+    order: number;
+    _count: { questions: number; flashcards: number; assets: number };
+  }) => void;
 }) {
   const [step, setStep] = useState(0);
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
-  const [category, setCategory] = useState("عمومی");
+  const [kind, setKind] = useState("STRUCTURED");
   const [file, setFile] = useState<File | null>(null);
   const [progress, setProgress] = useState(0);
   const [phase, setPhase] = useState<string>("");
@@ -232,11 +285,11 @@ function CreateCourseDialog({
 
   async function handleCreate() {
     if (!title.trim()) {
-      toast.error("عنوان درس را وارد کنید");
+      toast.error("عنوان جزوه را وارد کنید");
       return;
     }
     if (!file) {
-      toast.error("فایل PDF جزوه را انتخاب کنید");
+      toast.error("فایل ZIP جزوه را انتخاب کنید");
       return;
     }
     setBusy(true);
@@ -245,51 +298,28 @@ function CreateCourseDialog({
     setProgress(5);
 
     try {
-      setPhase("در حال تبدیل صفحات PDF به تصویر...");
-      const { renderPdfToImages } = await import("@/lib/pdf-client");
-      const pages = await renderPdfToImages(file, {
-        scale: 2,
-        onProgress: ({ page, total }) => {
-          setProgress(5 + Math.round((page / total) * 75));
-          setPhase(`تبدیل صفحه ${toFa(page)} از ${toFa(total)}`);
-        },
-      });
-      if (pages.length === 0) {
-        throw new Error("هیچ صفحه‌ای در فایل PDF یافت نشد");
-      }
-
-      setPhase("در حال آپلود تصاویر و ایجاد درس...");
-      setProgress(85);
+      setPhase("در حال پردازش فایل ZIP...");
+      setProgress(10);
 
       const formData = new FormData();
       formData.append("title", title);
       formData.append("description", description);
-      formData.append("category", category);
+      formData.append("kind", kind);
       formData.append("file", file);
-      pages.forEach((p, i) => {
-        formData.append(
-          "images",
-          p.blob,
-          `page-${String(i + 1).padStart(3, "0")}.jpg`,
-        );
-      });
-      formData.append(
-        "meta",
-        JSON.stringify(
-          pages.map((p) => ({ width: p.width, height: p.height })),
-        ),
-      );
 
-      const createRes = await fetch("/api/courses", {
+      setProgress(30);
+      setPhase("در حال آپلود و پردازش...");
+
+      const createRes = await fetch("/api/modules/import", {
         method: "POST",
         body: formData,
       });
       const createData = await createRes.json();
       if (!createRes.ok)
-        throw new Error(createData.error ?? "خطا در ایجاد درس");
-      const course = createData.course;
+        throw new Error(createData.error ?? "خطا در ایجاد جزوه");
+      const note = createData.note;
       setProgress(100);
-      onCreated(course);
+      onCreated(note);
     } catch (err) {
       setError(err instanceof Error ? err.message : "خطای ناشناخته");
       setStep(2);
@@ -323,17 +353,17 @@ function CreateCourseDialog({
 
         {step === 0 && (
           <>
-            <h2 className="mb-1 text-lg font-bold">ایجاد درس جدید</h2>
+            <h2 className="mb-1 text-lg font-bold">ایجاد جزوه جدید</h2>
             <p className="mb-6 text-sm text-muted-foreground">
-              اطلاعات درس و فایل PDF جزوه را وارد کنید
+              اطلاعات جزوه و فایل ZIP (حاوی دروس، تصاویر و سوالات) را آپلود کنید
             </p>
             <div className="space-y-4">
               <div className="space-y-2">
-                <Label>عنوان درس</Label>
+                <Label>عنوان جزوه</Label>
                 <Input
                   value={title}
                   onChange={(e) => setTitle(e.target.value)}
-                  placeholder="مثال: آناتومی اندام فوقانی"
+                  placeholder="مثال: ژنتیک پزشکی"
                   autoFocus
                 />
               </div>
@@ -342,27 +372,24 @@ function CreateCourseDialog({
                 <Textarea
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
-                  placeholder="توضیح کوتاهی درباره این درس..."
+                  placeholder="توضیح کوتاهی درباره این جزوه..."
                   rows={3}
                 />
               </div>
               <div className="space-y-2">
-                <Label>دسته‌بندی</Label>
-                <Select value={category} onValueChange={setCategory}>
+                <Label>نوع جزوه</Label>
+                <Select value={kind} onValueChange={setKind}>
                   <SelectTrigger>
-                    <SelectValue placeholder="انتخاب دسته‌بندی" />
+                    <SelectValue placeholder="انتخاب نوع" />
                   </SelectTrigger>
                   <SelectContent>
-                    {COURSE_CATEGORIES.map((c) => (
-                      <SelectItem key={c} value={c}>
-                        {c}
-                      </SelectItem>
-                    ))}
+                    <SelectItem value="STRUCTURED">ساختاریافته (متن + تصاویر)</SelectItem>
+                    <SelectItem value="IMAGE_ONLY">فقط تصویری (PDF)</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
               <div className="space-y-2">
-                <Label>فایل PDF جزوه</Label>
+                <Label>فایل ZIP جزوه</Label>
                 <label className="flex cursor-pointer flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed border-border bg-muted/40 p-8 text-center transition-colors hover:border-teal-500/50 hover:bg-teal-500/5">
                   <BookOpen className="h-8 w-8 text-muted-foreground" />
                   <span className="text-sm font-medium">
@@ -371,11 +398,11 @@ function CreateCourseDialog({
                   <span className="text-xs text-muted-foreground">
                     {file
                       ? `${toFa(Math.round(file.size / 1024))} کیلوبایت`
-                      : "پشتیبانی از PDF تا ۲۰۰ مگابایت"}
+                      : "پشتیبانی از ZIP تا ۲۰۰ مگابایت"}
                   </span>
                   <input
                     type="file"
-                    accept="application/pdf"
+                    accept=".zip"
                     className="hidden"
                     onChange={(e) => setFile(e.target.files?.[0] ?? null)}
                   />
@@ -399,7 +426,7 @@ function CreateCourseDialog({
                   onClick={handleCreate}
                   loading={busy}
                 >
-                  ایجاد درس
+                  ایجاد جزوه
                 </Button>
               </div>
             </div>
@@ -416,7 +443,7 @@ function CreateCourseDialog({
               )}
             </div>
             <h3 className="mb-2 font-bold">
-              {progress >= 100 ? "پردازش کامل شد!" : "در حال پردازش درس..."}
+              {progress >= 100 ? "پردازش کامل شد!" : "در حال پردازش جزوه..."}
             </h3>
             <p className="mb-6 text-sm text-muted-foreground">{phase}</p>
             <Progress

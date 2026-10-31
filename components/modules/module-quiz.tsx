@@ -10,7 +10,7 @@ import {
 } from "lucide-react";
 import type {
   AttemptData,
-  LessonData,
+  NoteData,
   QuestionData,
   ResponseData,
 } from "@/components/modules/types";
@@ -47,7 +47,7 @@ interface ModuleQuizProps {
   title: string;
   description: string;
   questions: QuestionData[];
-  lessons: LessonData[];
+  lessons: NoteData[];
   attempts: AttemptData[];
   responses: Record<string, ResponseData>;
   onAttemptSaved: (attempt: AttemptData) => void;
@@ -187,7 +187,7 @@ export function ModuleQuiz({
   if (!questions.length) {
     return (
       <div className="rounded-2xl border border-dashed border-border py-16 text-center text-muted-foreground">
-        سؤالی برای این ماژول ثبت نشده است.
+        سؤالی برای این جزوه ثبت نشده است.
       </div>
     );
   }

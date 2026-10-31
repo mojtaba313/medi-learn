@@ -18,49 +18,46 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { toFa, formatRelative } from "@/lib/utils";
 
-export const metadata = { title: "ماژول‌های مطالعه" };
+export const metadata = { title: "جزوه‌های مطالعه" };
 
 export default async function ModulesPage() {
   const user = await requireAuth();
 
-  const modules = await db.module.findMany({
+  const notes = await db.note.findMany({
     orderBy: [{ order: "asc" }, { createdAt: "asc" }],
     include: {
-      lessons: {
-        orderBy: { order: "asc" },
-        select: { id: true, slug: true, title: true, mins: true },
-      },
       _count: { select: { questions: true, flashcards: true } },
     },
   });
 
-  const moduleIds = modules.map((module) => module.id);
-  const [progressRows, notes, annotations, bookmarks, reviews] = await Promise.all([
-    db.lessonProgress.findMany({
-      where: { userId: user.id, lesson: { moduleId: { in: moduleIds } } },
-      select: {
-        done: true,
-        lastOpenedAt: true,
-        lesson: { select: { moduleId: true } },
-      },
-    }),
-    db.lessonNote.findMany({
-      where: { userId: user.id, lesson: { moduleId: { in: moduleIds } } },
-      select: { lesson: { select: { moduleId: true } } },
-    }),
-    db.lessonAnnotation.findMany({
-      where: { userId: user.id, lesson: { moduleId: { in: moduleIds } } },
-      select: { lesson: { select: { moduleId: true } } },
-    }),
-    db.bookmark.findMany({
-      where: { userId: user.id, lesson: { moduleId: { in: moduleIds } } },
-      select: { lesson: { select: { moduleId: true } } },
-    }),
-    db.flashcardReview.findMany({
-      where: { userId: user.id, card: { moduleId: { in: moduleIds } } },
-      select: { due: true, card: { select: { moduleId: true } } },
-    }),
-  ]);
+  const noteIds = notes.map((note) => note.id);
+  const [progressRows, noteRows, annotations, bookmarks, reviews] =
+    await Promise.all([
+      db.noteProgress.findMany({
+        where: { userId: user.id, noteId: { in: noteIds } },
+        select: {
+          done: true,
+          lastOpenedAt: true,
+          noteId: true,
+        },
+      }),
+      db.noteNote.findMany({
+        where: { userId: user.id, noteId: { in: noteIds } },
+        select: { noteId: true },
+      }),
+      db.textAnnotation.findMany({
+        where: { userId: user.id, noteId: { in: noteIds } },
+        select: { noteId: true },
+      }),
+      db.bookmark.findMany({
+        where: { userId: user.id, noteId: { in: noteIds } },
+        select: { noteId: true },
+      }),
+      db.flashcardReview.findMany({
+        where: { userId: user.id, card: { noteId: { in: noteIds } } },
+        select: { due: true, card: { select: { noteId: true } } },
+      }),
+    ]);
 
   const now = new Date();
   const stats = new Map<
@@ -74,9 +71,9 @@ export default async function ModulesPage() {
       lastOpenedAt: Date | null;
     }
   >();
-  const get = (moduleId: string) => {
-    if (!stats.has(moduleId)) {
-      stats.set(moduleId, {
+  const get = (noteId: string) => {
+    if (!stats.has(noteId)) {
+      stats.set(noteId, {
         done: 0,
         notes: 0,
         highlights: 0,
@@ -85,29 +82,29 @@ export default async function ModulesPage() {
         lastOpenedAt: null,
       });
     }
-    return stats.get(moduleId)!;
+    return stats.get(noteId)!;
   };
 
-  for (const moduleItem of modules) {
-    get(moduleItem.id).due = moduleItem._count.flashcards;
+  for (const noteItem of notes) {
+    get(noteItem.id).due = noteItem._count.flashcards;
   }
 
   for (const row of progressRows) {
-    const entry = get(row.lesson.moduleId);
+    const entry = get(row.noteId);
     if (row.done) entry.done += 1;
     if (row.lastOpenedAt && (!entry.lastOpenedAt || row.lastOpenedAt > entry.lastOpenedAt)) {
       entry.lastOpenedAt = row.lastOpenedAt;
     }
   }
-  for (const row of notes) get(row.lesson.moduleId).notes += 1;
-  for (const row of annotations) get(row.lesson.moduleId).highlights += 1;
-  for (const row of bookmarks) get(row.lesson.moduleId).bookmarks += 1;
+  for (const row of noteRows) get(row.noteId).notes += 1;
+  for (const row of annotations) get(row.noteId).highlights += 1;
+  for (const row of bookmarks) get(row.noteId).bookmarks += 1;
   for (const row of reviews) {
-    if (row.due > now) get(row.card.moduleId).due -= 1;
+    if (row.due > now) get(row.card.noteId).due -= 1;
   }
 
   const totalDone = Array.from(stats.values()).reduce((sum, entry) => sum + entry.done, 0);
-  const totalLessons = modules.reduce((sum, module) => sum + module.lessons.length, 0);
+  const totalLessons = notes.length;
 
   return (
     <AppShell>
@@ -118,7 +115,7 @@ export default async function ModulesPage() {
               <Layers className="h-3.5 w-3.5" />
               درس‌یار تعاملی
             </div>
-            <h1 className="text-2xl font-bold sm:text-3xl">ماژول‌های مطالعه</h1>
+            <h1 className="text-2xl font-bold sm:text-3xl">جزوه‌های مطالعه</h1>
             <p className="mt-1 max-w-2xl text-muted-foreground">
               درس‌های ساختارمند همراه با هایلایت، یادداشت، فلش‌کارت و آزمون جامع.
             </p>
@@ -131,14 +128,14 @@ export default async function ModulesPage() {
           </div>
         </div>
 
-        {modules.length === 0 ? (
+        {notes.length === 0 ? (
           <div className="rounded-2xl border border-dashed border-border py-20 text-center text-muted-foreground">
-            هنوز ماژولی وارد نشده است.
+            هنوز جزوهی وارد نشده است.
           </div>
         ) : (
           <div className="grid gap-5 md:grid-cols-2">
-            {modules.map((module) => {
-              const entry = stats.get(module.id) ?? {
+            {notes.map((note) => {
+              const entry = stats.get(note.id) ?? {
                 done: 0,
                 notes: 0,
                 highlights: 0,
@@ -146,20 +143,20 @@ export default async function ModulesPage() {
                 due: 0,
                 lastOpenedAt: null,
               };
-              const total = module.lessons.length;
+              const total = 1;
               const percent = total > 0 ? Math.round((entry.done / total) * 100) : 0;
 
               return (
                 <Card
-                  key={module.id}
+                  key={note.id}
                   className="group overflow-hidden border-border/60 transition-colors hover:border-teal-500/40"
                 >
                   <CardContent className="p-0">
                     <div className="relative border-b border-border/60 bg-gradient-to-l from-teal-500/10 via-cyan-500/5 to-transparent p-5">
                       <div className="mb-2 flex flex-wrap items-center gap-2">
-                        <Badge variant="secondary">ماژول {toFa(module.number)}</Badge>
-                        {module.eyebrow && (
-                          <span className="text-xs text-muted-foreground">{module.eyebrow}</span>
+                        <Badge variant="secondary">نوت {toFa(note.number)}</Badge>
+                        {note.eyebrow && (
+                          <span className="text-xs text-muted-foreground">{note.eyebrow}</span>
                         )}
                         {entry.due > 0 && (
                           <Badge className="bg-amber-500/15 text-amber-700 hover:bg-amber-500/20 dark:text-amber-400">
@@ -167,9 +164,9 @@ export default async function ModulesPage() {
                           </Badge>
                         )}
                       </div>
-                      <h2 className="text-xl font-bold leading-8">{module.cardTitle}</h2>
+                      <h2 className="text-xl font-bold leading-8">{note.cardTitle}</h2>
                       <p className="mt-1 line-clamp-2 text-sm leading-6 text-muted-foreground">
-                        {module.cardDescription ?? module.description}
+                        {note.cardDescription ?? note.description}
                       </p>
                     </div>
 
@@ -178,15 +175,15 @@ export default async function ModulesPage() {
                         <div className="mb-2 flex items-center justify-between text-xs text-muted-foreground">
                           <span>{toFa(percent)}٪ تکمیل</span>
                           <span>
-                            {toFa(entry.done)} از {toFa(total)} درس
+                            {toFa(entry.done)} از {toFa(total)} نوت
                           </span>
                         </div>
                         <Progress value={percent} className="h-2" />
                       </div>
 
                       <div className="grid grid-cols-2 gap-2 text-xs sm:grid-cols-4">
-                        <Stat icon={FileQuestion} value={module._count.questions} label="سوال" />
-                        <Stat icon={Brain} value={module._count.flashcards} label="فلش‌کارت" />
+                        <Stat icon={FileQuestion} value={note._count.questions} label="سوال" />
+                        <Stat icon={Brain} value={note._count.flashcards} label="فلش‌کارت" />
                         <Stat icon={Highlighter} value={entry.highlights} label="هایلایت" />
                         <Stat icon={NotebookPen} value={entry.notes} label="یادداشت" />
                       </div>
@@ -205,7 +202,7 @@ export default async function ModulesPage() {
                           )}
                         </div>
                         <Link
-                          href={`/modules/${module.id}`}
+                          href={`/modules/${note.id}`}
                           className="inline-flex items-center gap-1 rounded-xl bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-opacity hover:opacity-90"
                         >
                           {entry.done > 0 ? "ادامه مطالعه" : "شروع مطالعه"}

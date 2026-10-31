@@ -16,7 +16,7 @@ export async function POST(
 
   const { id, cardId } = await params;
   const card = await db.flashcard.findFirst({
-    where: { id: cardId, moduleId: id },
+    where: { id: cardId, noteId: id },
     select: { id: true },
   });
   if (!card) return err("فلش‌کارت پیدا نشد", 404);

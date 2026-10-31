@@ -27,8 +27,8 @@ export async function POST(
   const parsed = schema.safeParse(body);
   if (!parsed.success) return err("داده نامعتبر", 422);
 
-  const questions = await db.moduleQuestion.findMany({
-    where: { moduleId: id },
+  const questions = await db.noteQuestion.findMany({
+    where: { noteId: id },
     select: { id: true, correctOption: true, topic: true },
   });
   const questionMap = new Map(questions.map((q) => [q.id, q]));
@@ -79,7 +79,7 @@ export async function POST(
 
   const attempt = await db.$transaction(async (tx) => {
     for (const row of answerRows) {
-      await tx.moduleQuestionResponse.upsert({
+      await tx.noteQuestionResponse.upsert({
         where: {
           userId_questionId: {
             userId: session.userId,
@@ -102,10 +102,10 @@ export async function POST(
       });
     }
 
-    return tx.moduleQuizAttempt.create({
+    return tx.noteQuizAttempt.create({
       data: {
         userId: session.userId,
-        moduleId: id,
+        noteId: id,
         mode: parsed.data.mode.toUpperCase(),
         score: correct,
         total,

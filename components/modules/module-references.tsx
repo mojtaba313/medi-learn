@@ -25,7 +25,7 @@ export function ModuleReferences({
   if (!html) {
     return (
       <div className="rounded-2xl border border-dashed border-border py-16 text-center text-muted-foreground">
-        منبعی برای این ماژول ثبت نشده است.
+        منبعی برای این جزوه ثبت نشده است.
       </div>
     );
   }

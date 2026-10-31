@@ -7,24 +7,27 @@ export const metadata = { title: "پنل مدیریت" };
 export default async function AdminPage() {
   const user = await requireAdmin();
 
-  const courses = await db.course.findMany({
+  const notes = await db.note.findMany({
     where: { createdById: user.id },
-    include: { _count: { select: { pages: true, questions: true } } },
-    orderBy: { createdAt: "desc" },
+    include: {
+      _count: { select: { questions: true, flashcards: true, assets: true } },
+    },
+    orderBy: { order: "asc" },
   });
 
-  const pageCounts = await db.page.groupBy({
-    by: ["courseId"],
-    _count: { _all: true },
-  });
-  const counts = new Map(pageCounts.map((p) => [p.courseId, p._count._all]));
-
-  const serialized = courses.map((c) => ({
-    ...c,
-    createdAt: c.createdAt.toISOString(),
-    updatedAt: c.updatedAt.toISOString(),
-    totalPages: counts.get(c.id) ?? 0,
+  const serialized = notes.map((n) => ({
+    id: n.id,
+    title: n.title,
+    cardTitle: n.cardTitle,
+    description: n.description,
+    kind: n.kind,
+    order: n.order,
+    _count: {
+      questions: n._count.questions,
+      flashcards: n._count.flashcards,
+      assets: n._count.assets,
+    },
   }));
 
-  return <AdminDashboard initialCourses={serialized} />;
+  return <AdminDashboard initialNotes={serialized} />;
 }

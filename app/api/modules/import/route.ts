@@ -5,10 +5,9 @@ import { getSession } from "@/lib/auth";
 import { err, ok } from "@/lib/api";
 import { blocksSchema } from "@/lib/content-blocks";
 import {
-  importModule,
-  type LessonJsonInput,
-  type ModuleAssetInput,
-  type ModuleJsonInput,
+  importNote,
+  type NoteAssetInput,
+  type NoteJsonInput,
 } from "@/lib/module-import";
 
 const assetSchema = z
@@ -23,33 +22,25 @@ const assetSchema = z
   })
   .passthrough();
 
-const moduleSchema = z
+const noteSchema = z
   .object({
     id: z.string().min(1),
     title: z.string().min(1),
     description: z.string().default(""),
+    blocks: blocksSchema.optional(),
     assets: z.array(assetSchema).optional(),
   })
   .passthrough();
 
-const lessonSchema = z
-  .object({
-    id: z.string().min(1),
-    title: z.string().min(1),
-    blocks: blocksSchema,
-  })
-  .passthrough();
-
 const payloadSchema = z.object({
-  module: moduleSchema,
-  lessons: z.array(lessonSchema).min(1),
+  note: noteSchema,
 });
 
 function assetIdForFile(name: string) {
   return name.replace(/\.[^.]+$/, "").replace(/[^\w.-]+/g, "-");
 }
 
-function findManifestAsset(assets: ModuleAssetInput[], file: File) {
+function findManifestAsset(assets: NoteAssetInput[], file: File) {
   const lower = file.name.toLowerCase();
   return assets.find((asset) => {
     if (asset.fileName?.toLowerCase() === lower) return true;
@@ -58,22 +49,42 @@ function findManifestAsset(assets: ModuleAssetInput[], file: File) {
   });
 }
 
+function getMimeType(fileName: string): string {
+  const ext = fileName.toLowerCase().split(".").pop() ?? "";
+  switch (ext) {
+    case "png": return "image/png";
+    case "jpg":
+    case "jpeg": return "image/jpeg";
+    case "webp": return "image/webp";
+    case "gif": return "image/gif";
+    case "pdf": return "application/pdf";
+    default: return "application/octet-stream";
+  }
+}
+
 async function readPayload(request: NextRequest) {
   const contentType = request.headers.get("content-type") ?? "";
 
   if (contentType.includes("multipart/form-data")) {
     const form = await request.formData();
+    
+    // Check for ZIP file
+    const zipFile = form.get("zip") as File | null;
+    if (zipFile && (zipFile.type === "application/zip" || zipFile.name.endsWith(".zip"))) {
+      // For now, throw an error - ZIP support requires unzipper package
+      throw new Error("پشتیبانی از فایل ZIP در حال حاضر غیرفعال است. لطفاً فایل JSON و تصاویر را جداگانه آپلود کنید.");
+    }
+
     const raw = form.get("payload") ?? form.get("data");
     if (typeof raw !== "string") {
-      throw new Error("دادهٔ ماژول ارسال نشده است.");
+      throw new Error("دادهٔ جزوه ارسال نشده است.");
     }
     const parsed = payloadSchema.parse(JSON.parse(raw));
-    const moduleData = parsed.module as ModuleJsonInput;
-    const lessons = parsed.lessons as LessonJsonInput[];
-    const manifest: ModuleAssetInput[] = (moduleData.assets ?? []).map((asset) => ({ ...asset }));
+    const noteData = parsed.note as NoteJsonInput;
+    const manifest: NoteAssetInput[] = (noteData.assets ?? []).map((asset) => ({ ...asset }));
     const files = form.getAll("assets").filter((item): item is File => item instanceof File);
 
-    const inputs: ModuleAssetInput[] = [];
+    const inputs: NoteAssetInput[] = [];
     for (const file of files) {
       const existing = findManifestAsset(manifest, file);
       const assetId = existing?.assetId ?? assetIdForFile(file.name);
@@ -92,14 +103,14 @@ async function readPayload(request: NextRequest) {
       }
     }
 
-    return { module: moduleData, lessons, assets: inputs };
+    return { note: noteData, assets: inputs };
   }
 
   const body = (await request.json()) as unknown;
   const parsed = payloadSchema.parse(body);
   return {
     ...parsed,
-    assets: (parsed.module.assets ?? []) as ModuleAssetInput[],
+    assets: (parsed.note.assets ?? []) as NoteAssetInput[],
   };
 }
 
@@ -110,18 +121,12 @@ export async function POST(request: NextRequest) {
 
   try {
     const payload = await readPayload(request);
-    const result = await importModule(
-      db,
-      payload.module as ModuleJsonInput,
-      payload.lessons as LessonJsonInput[],
-      session.userId,
-      payload.assets as ModuleAssetInput[] | undefined,
-    );
+    const result = await importNote(db, payload.note as NoteJsonInput, session.userId, payload.assets as NoteAssetInput[] | undefined);
 
     return ok({
-      module: result.module,
+      note: result.note,
       counts: {
-        lessons: result.lessons,
+        blocks: result.blocks,
         questions: result.questions,
         flashcards: result.flashcards,
         assets: result.assets,
@@ -131,6 +136,6 @@ export async function POST(request: NextRequest) {
     if (error instanceof z.ZodError) {
       return err(error.issues[0]?.message ?? "داده نامعتبر", 422);
     }
-    return err(error instanceof Error ? error.message : "وارد کردن ماژول انجام نشد", 422);
+    return err(error instanceof Error ? error.message : "وارد کردن جزوه انجام نشد", 422);
   }
 }

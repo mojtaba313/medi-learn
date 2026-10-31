@@ -13,12 +13,12 @@ export async function PUT(
   const session = await getSession();
   if (!session) return err("دسترسی غیرمجاز", 401);
 
-  const { id, lessonId } = await params;
-  const lesson = await db.lesson.findUnique({
-    where: { moduleId_slug: { moduleId: id, slug: lessonId } },
+  const { lessonId: noteId } = await params;
+  const note = await db.note.findUnique({
+    where: { id: noteId },
     select: { id: true },
   });
-  if (!lesson) return err("درس پیدا نشد", 404);
+  if (!note) return err("نوت پیدا نشد", 404);
 
   const body = await readJson<unknown>(request);
   const parsed = schema.safeParse(body);
@@ -26,17 +26,17 @@ export async function PUT(
 
   const text = parsed.data.text;
   if (!text.trim()) {
-    await db.lessonNote.deleteMany({
-      where: { userId: session.userId, lessonId: lesson.id },
+    await db.noteNote.deleteMany({
+      where: { userId: session.userId, noteId: note.id },
     });
     return ok({ text: "" });
   }
 
-  const note = await db.lessonNote.upsert({
-    where: { userId_lessonId: { userId: session.userId, lessonId: lesson.id } },
-    create: { userId: session.userId, lessonId: lesson.id, text },
+  const noteRow = await db.noteNote.upsert({
+    where: { userId_noteId: { userId: session.userId, noteId: note.id } },
+    create: { userId: session.userId, noteId: note.id, text },
     update: { text },
   });
 
-  return ok({ text: note.text, updatedAt: note.updatedAt });
+  return ok({ text: noteRow.text, updatedAt: noteRow.updatedAt });
 }

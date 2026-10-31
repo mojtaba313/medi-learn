@@ -7,7 +7,7 @@ import {
 } from "@/lib/content-blocks";
 import { putObject } from "@/lib/s3";
 
-export interface ModuleQuestionInput {
+export interface NoteQuestionInput {
   topic?: string;
   question: string;
   choices: string[];
@@ -16,7 +16,7 @@ export interface ModuleQuestionInput {
   blockId?: string;
 }
 
-export interface ModuleAssetJson {
+export interface NoteAssetJson {
   assetId: string;
   fileName?: string;
   kind?: string;
@@ -26,7 +26,7 @@ export interface ModuleAssetJson {
   height?: number | null;
 }
 
-export interface ModuleJsonInput {
+export interface NoteJsonInput {
   id: string;
   order?: number;
   number?: number;
@@ -39,34 +39,35 @@ export interface ModuleJsonInput {
   pills?: string[];
   footer?: string;
   quiz?: { navLabel?: string; title?: string; description?: string };
-  questions?: ModuleQuestionInput[];
+  questions?: NoteQuestionInput[];
   flashcards?: { term: string; definition: string }[];
   references?: { title?: string; intro?: string; html?: string };
   gallery?: unknown;
-  assets?: ModuleAssetJson[];
+  blocks?: ContentBlock[];
+  searchText?: string;
+  assets?: NoteAssetJson[];
 }
 
-export interface LessonJsonInput {
-  id: string;
-  order?: number;
-  title: string;
-  mins?: string;
-  source?: string;
-  summary?: string;
-  blocks: ContentBlock[];
-  html?: string;
-}
-
-export interface ModuleAssetInput extends ModuleAssetJson {
+export interface NoteAssetInput extends NoteAssetJson {
   buffer?: Buffer | Uint8Array;
+}
+
+import type { Note } from "@prisma/client";
+
+export interface NoteImportResult {
+  note: Note;
+  blocks: number;
+  questions: number;
+  flashcards: number;
+  assets: number;
 }
 
 function safeFileName(value: string) {
   return value.replace(/[^\w.\-]+/g, "-").replace(/^-+|-+$/g, "") || "asset";
 }
 
-export function moduleAssetKey(moduleId: string, assetId: string, fileName: string) {
-  return `modules/${moduleId}/assets/${safeFileName(assetId)}-${safeFileName(fileName)}`;
+export function noteAssetKey(noteId: string, assetId: string, fileName: string) {
+  return `notes/${noteId}/assets/${safeFileName(assetId)}-${safeFileName(fileName)}`;
 }
 
 function mimeFromName(name: string) {
@@ -78,86 +79,86 @@ function mimeFromName(name: string) {
   return "image/jpeg";
 }
 
-function assertBlocks(lesson: LessonJsonInput, assetIds: Set<string>) {
+function assertBlocks(blocks: ContentBlock[] | undefined, assetIds: Set<string>) {
+  if (!blocks) return;
   const seen = new Set<string>();
-  for (const block of lesson.blocks) {
+  for (const block of blocks) {
     if (seen.has(block.id)) {
-      throw new Error(`شناسهٔ بلوک تکراری در درس «${lesson.title}»: ${block.id}`);
+      throw new Error(`شناسهٔ بلوک تکراری: ${block.id}`);
     }
     seen.add(block.id);
     if (block.type === "image" && !assetIds.has(block.assetId)) {
       throw new Error(
-        `تصویر «${block.assetId}» در دارایی‌های ماژول پیدا نشد (درس «${lesson.title}»).`,
+        `تصویر «${block.assetId}» در دارایی‌های جزوه پیدا نشد.`,
       );
     }
   }
 }
 
-export async function importModule(
+export async function importNote(
   prisma: PrismaClient,
-  moduleData: ModuleJsonInput,
-  lessons: LessonJsonInput[],
+  noteData: NoteJsonInput,
   createdById?: string,
-  assetInputs: ModuleAssetInput[] = [],
+  assetInputs: NoteAssetInput[] = [],
 ) {
-  const moduleId = moduleData.id;
-  const sortedLessons = [...lessons].sort(
-    (a, b) => (a.order ?? 0) - (b.order ?? 0) || a.id.localeCompare(b.id),
-  );
-
-  const allBlocks = sortedLessons.flatMap((lesson) => lesson.blocks ?? []);
+  const noteId = noteData.id;
+  const blocks = noteData.blocks ?? [];
   const kind =
-    moduleData.kind ??
-    (allBlocks.length > 0 && isImageOnly(allBlocks) ? "IMAGE_ONLY" : "STRUCTURED");
+    noteData.kind ??
+    (blocks.length > 0 && isImageOnly(blocks) ? "IMAGE_ONLY" : "STRUCTURED");
 
-  const moduleRecord = await prisma.module.upsert({
-    where: { id: moduleId },
+  const noteRecord = await prisma.note.upsert({
+    where: { id: noteId },
     create: {
-      id: moduleId,
-      slug: moduleId,
+      id: noteId,
+      slug: noteId,
       kind,
-      order: moduleData.order ?? moduleData.number ?? 0,
-      number: moduleData.number ?? moduleData.order ?? 0,
-      title: moduleData.title,
-      cardTitle: moduleData.cardTitle ?? moduleData.title,
-      eyebrow: moduleData.eyebrow ?? null,
-      cardDescription: moduleData.cardDescription ?? null,
-      description: moduleData.description,
-      pills: moduleData.pills ?? [],
-      footer: moduleData.footer ?? null,
-      gallery: (moduleData.gallery as object | undefined) ?? undefined,
-      referencesTitle: moduleData.references?.title ?? null,
-      referencesIntro: moduleData.references?.intro ?? null,
-      referencesHtml: moduleData.references?.html ?? null,
-      quizTitle: moduleData.quiz?.title ?? null,
-      quizDescription: moduleData.quiz?.description ?? null,
-      quizNavLabel: moduleData.quiz?.navLabel ?? null,
+      order: noteData.order ?? noteData.number ?? 0,
+      number: noteData.number ?? noteData.order ?? 0,
+      title: noteData.title,
+      cardTitle: noteData.cardTitle ?? noteData.title,
+      eyebrow: noteData.eyebrow ?? null,
+      cardDescription: noteData.cardDescription ?? null,
+      description: noteData.description,
+      pills: noteData.pills ?? [],
+      footer: noteData.footer ?? null,
+      gallery: (noteData.gallery as object | undefined) ?? undefined,
+      referencesTitle: noteData.references?.title ?? null,
+      referencesIntro: noteData.references?.intro ?? null,
+      referencesHtml: noteData.references?.html ?? null,
+      quizTitle: noteData.quiz?.title ?? null,
+      quizDescription: noteData.quiz?.description ?? null,
+      quizNavLabel: noteData.quiz?.navLabel ?? null,
+      blocks: blocks as never,
+      searchText: noteData.searchText ?? blocksToPlainText(blocks),
       createdById: createdById ?? null,
     },
     update: {
-      slug: moduleId,
+      slug: noteId,
       kind,
-      order: moduleData.order ?? moduleData.number ?? 0,
-      number: moduleData.number ?? moduleData.order ?? 0,
-      title: moduleData.title,
-      cardTitle: moduleData.cardTitle ?? moduleData.title,
-      eyebrow: moduleData.eyebrow ?? null,
-      cardDescription: moduleData.cardDescription ?? null,
-      description: moduleData.description,
-      pills: moduleData.pills ?? [],
-      footer: moduleData.footer ?? null,
-      gallery: (moduleData.gallery as object | undefined) ?? undefined,
-      referencesTitle: moduleData.references?.title ?? null,
-      referencesIntro: moduleData.references?.intro ?? null,
-      referencesHtml: moduleData.references?.html ?? null,
-      quizTitle: moduleData.quiz?.title ?? null,
-      quizDescription: moduleData.quiz?.description ?? null,
-      quizNavLabel: moduleData.quiz?.navLabel ?? null,
+      order: noteData.order ?? noteData.number ?? 0,
+      number: noteData.number ?? noteData.order ?? 0,
+      title: noteData.title,
+      cardTitle: noteData.cardTitle ?? noteData.title,
+      eyebrow: noteData.eyebrow ?? null,
+      cardDescription: noteData.cardDescription ?? null,
+      description: noteData.description,
+      pills: noteData.pills ?? [],
+      footer: noteData.footer ?? null,
+      gallery: (noteData.gallery as object | undefined) ?? undefined,
+      referencesTitle: noteData.references?.title ?? null,
+      referencesIntro: noteData.references?.intro ?? null,
+      referencesHtml: noteData.references?.html ?? null,
+      quizTitle: noteData.quiz?.title ?? null,
+      quizDescription: noteData.quiz?.description ?? null,
+      quizNavLabel: noteData.quiz?.navLabel ?? null,
+      blocks: blocks as never,
+      searchText: noteData.searchText ?? blocksToPlainText(blocks),
       ...(createdById ? { createdById } : {}),
     },
   });
 
-  const manifest = moduleData.assets ?? [];
+  const manifest = noteData.assets ?? [];
   const manifestById = new Map(manifest.map((asset) => [asset.assetId, asset]));
   const inputById = new Map(assetInputs.map((asset) => [asset.assetId, asset]));
   const assetIds = new Set<string>([
@@ -167,7 +168,7 @@ export async function importModule(
 
   for (const assetId of assetIds) {
     const manifestAsset = manifestById.get(assetId);
-    const input = inputById.get(assetId) ?? (manifestAsset as ModuleAssetInput | undefined);
+    const input = inputById.get(assetId) ?? (manifestAsset as NoteAssetInput | undefined);
     if (!input) continue;
 
     const fileName = input.fileName ?? manifestAsset?.fileName ?? assetId;
@@ -177,12 +178,12 @@ export async function importModule(
       if (!input.buffer) {
         throw new Error(`فایل دارایی «${assetId}» ارسال نشده است.`);
       }
-      storageKey = moduleAssetKey(moduleId, assetId, fileName);
+      storageKey = noteAssetKey(noteId, assetId, fileName);
       await putObject(storageKey, input.buffer, mimeType);
     }
 
     const data = {
-      moduleId,
+      noteId,
       assetId,
       kind: input.kind ?? manifestAsset?.kind ?? "IMAGE",
       fileName,
@@ -193,57 +194,31 @@ export async function importModule(
       storageKey,
     };
 
-    await prisma.moduleAsset.upsert({
-      where: { moduleId_assetId: { moduleId, assetId } },
+    await prisma.noteAsset.upsert({
+      where: { noteId_assetId: { noteId, assetId } },
       create: data,
       update: data,
     });
   }
 
-  if (moduleData.assets) {
-    await prisma.moduleAsset.deleteMany({
-      where: { moduleId, assetId: { notIn: Array.from(assetIds) } },
+  if (noteData.assets) {
+    await prisma.noteAsset.deleteMany({
+      where: { noteId, assetId: { notIn: Array.from(assetIds) } },
     });
   }
 
-  const lessonIds = new Set<string>();
-  for (const lesson of sortedLessons) {
-    const blocks = lesson.blocks ?? [];
-    assertBlocks(lesson, assetIds);
-    lessonIds.add(lesson.id);
-    const data = {
-      moduleId,
-      slug: lesson.id,
-      order: lesson.order ?? 0,
-      title: lesson.title,
-      mins: lesson.mins ?? null,
-      source: lesson.source ?? null,
-      summary: lesson.summary ?? null,
-      html: "",
-      blocks: blocks as never,
-      searchText: blocksToPlainText(blocks),
-    };
-    await prisma.lesson.upsert({
-      where: { moduleId_slug: { moduleId, slug: lesson.id } },
-      create: { id: `${moduleId}:lesson:${lesson.id}`, ...data },
-      update: data,
-    });
-  }
+  assertBlocks(blocks, assetIds);
 
-  await prisma.lesson.deleteMany({
-    where: { moduleId, slug: { notIn: Array.from(lessonIds) } },
-  });
-
-  const questions = moduleData.questions ?? [];
   const questionIds = new Set<string>();
+  const questions = noteData.questions ?? [];
   for (const [index, question] of questions.entries()) {
-    const id = `${moduleId}:q:${index + 1}`;
+    const id = `${noteId}:q:${index + 1}`;
     questionIds.add(id);
     const choices = [...question.choices, "", "", "", ""].slice(0, 4);
     const correctOption = String.fromCharCode(65 + Math.max(0, Math.min(3, question.correct)));
     const data = {
-      moduleId,
-      lessonSlug: question.topic ?? null,
+      noteId,
+      noteSlug: question.topic ?? null,
       blockId: question.blockId ?? null,
       order: index,
       text: question.question,
@@ -255,23 +230,23 @@ export async function importModule(
       explanation: question.why,
       topic: question.topic ?? null,
     };
-    await prisma.moduleQuestion.upsert({
+    await prisma.noteQuestion.upsert({
       where: { id },
       create: { id, ...data },
       update: data,
     });
   }
-  await prisma.moduleQuestion.deleteMany({
-    where: { moduleId, id: { notIn: Array.from(questionIds) } },
+  await prisma.noteQuestion.deleteMany({
+    where: { noteId, id: { notIn: Array.from(questionIds) } },
   });
 
-  const flashcards = moduleData.flashcards ?? [];
   const flashcardIds = new Set<string>();
+  const flashcards = noteData.flashcards ?? [];
   for (const [index, card] of flashcards.entries()) {
-    const id = `${moduleId}:fc:${index + 1}`;
+    const id = `${noteId}:fc:${index + 1}`;
     flashcardIds.add(id);
     const data = {
-      moduleId,
+      noteId,
       order: index,
       term: card.term,
       definition: card.definition,
@@ -283,22 +258,22 @@ export async function importModule(
     });
   }
   await prisma.flashcard.deleteMany({
-    where: { moduleId, id: { notIn: Array.from(flashcardIds) } },
+    where: { noteId, id: { notIn: Array.from(flashcardIds) } },
   });
 
   return {
-    module: moduleRecord,
-    lessons: sortedLessons.length,
+    note: noteRecord,
+    blocks: blocks.length,
     questions: questions.length,
     flashcards: flashcards.length,
     assets: assetIds.size,
   };
 }
 
-export function validateModuleAssetRefs(lessons: LessonJsonInput[]) {
+export function validateNoteAssetRefs(blocks: ContentBlock[] | undefined) {
   const refs = new Set<string>();
-  for (const lesson of lessons) {
-    for (const assetId of collectAssetRefs(lesson.blocks ?? [])) refs.add(assetId);
+  if (blocks) {
+    for (const assetId of collectAssetRefs(blocks)) refs.add(assetId);
   }
   return Array.from(refs);
 }

@@ -27,7 +27,7 @@ export function ModuleGallery({
   if (!gallery || !collection) {
     return (
       <div className="rounded-2xl border border-dashed border-border py-16 text-center text-muted-foreground">
-        گالری‌ای برای این ماژول ثبت نشده است.
+        گالری‌ای برای این جزوه ثبت نشده است.
       </div>
     );
   }

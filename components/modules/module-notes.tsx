@@ -7,7 +7,7 @@ import {
   PencilLine,
   Trash2,
 } from "lucide-react";
-import type { LessonData } from "@/components/modules/types";
+import type { NoteData } from "@/components/modules/types";
 import type { TextAnnotation } from "@/lib/text-annotations";
 import { cn, toFa } from "@/lib/utils";
 
@@ -30,11 +30,11 @@ const downloadText = (filename: string, text: string) => {
 
 interface ModuleNotesProps {
   moduleTitle: string;
-  lessons: LessonData[];
+  lessons: NoteData[];
   notes: Record<string, string>;
   annotations: TextAnnotation[];
-  onOpenLesson: (slug: string) => void;
-  onDeleteNote: (slug: string) => void;
+  onOpenLesson: (id: string) => void;
+  onDeleteNote: (id: string) => void;
   onDeleteAnnotation: (id: string) => void;
 }
 
@@ -47,17 +47,17 @@ export function ModuleNotes({
   onDeleteNote,
   onDeleteAnnotation,
 }: ModuleNotesProps) {
-  const lessonBySlug = new Map(lessons.map((lesson) => [lesson.slug, lesson]));
+  const lessonBySlug = new Map(lessons.map((lesson) => [lesson.id, lesson]));
   const noteEntries = Object.entries(notes)
     .filter(([, text]) => text.trim())
-    .map(([slug, text]) => ({ lesson: lessonBySlug.get(slug), slug, text }))
+    .map(([id, text]) => ({ lesson: lessonBySlug.get(id), id, text }))
     .filter((entry) => entry.lesson);
 
   const exportMarkdown = () => {
     const lines = [`# ${moduleTitle}`, ""];
     lines.push("## یادداشت‌ها", "");
     for (const entry of noteEntries) {
-      lines.push(`### ${entry.lesson?.title ?? entry.slug}`, "", entry.text, "");
+      lines.push(`### ${entry.lesson?.title ?? entry.id}`, "", entry.text, "");
     }
     lines.push("## هایلایت‌ها", "");
     for (const annotation of annotations) {
@@ -80,7 +80,7 @@ export function ModuleNotes({
           <h1 className="text-2xl font-black sm:text-3xl">یادداشت‌ها و هایلایت‌ها</h1>
           <p className="mt-2 text-sm leading-7 text-muted-foreground">
             {toFa(noteEntries.length)} یادداشت و {toFa(annotations.length)} هایلایت در این
-            ماژول.
+            جزوه.
           </p>
         </div>
         <button
@@ -105,13 +105,13 @@ export function ModuleNotes({
           <div className="space-y-3">
             {noteEntries.map((entry) => (
               <div
-                key={entry.slug}
+                key={entry.id}
                 className="rounded-2xl border border-border/60 bg-card/70 p-4"
               >
                 <div className="mb-2 flex items-start justify-between gap-2">
                   <button
                     type="button"
-                    onClick={() => onOpenLesson(entry.slug)}
+                    onClick={() => onOpenLesson(entry.id)}
                     className="text-right font-semibold hover:text-primary"
                   >
                     {entry.lesson?.title}
@@ -119,7 +119,7 @@ export function ModuleNotes({
                   <div className="flex shrink-0 items-center gap-1">
                     <button
                       type="button"
-                      onClick={() => onOpenLesson(entry.slug)}
+                      onClick={() => onOpenLesson(entry.id)}
                       className="rounded-lg p-1.5 text-muted-foreground hover:bg-muted hover:text-primary"
                       title="ویرایش در درس"
                     >
@@ -127,7 +127,7 @@ export function ModuleNotes({
                     </button>
                     <button
                       type="button"
-                      onClick={() => onDeleteNote(entry.slug)}
+                      onClick={() => onDeleteNote(entry.id)}
                       className="rounded-lg p-1.5 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
                       title="حذف یادداشت"
                     >

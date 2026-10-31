@@ -1,4 +1,5 @@
 import { z } from "zod";
+import type { AnnotationData, AnnotationElement } from "@/lib/annotations";
 
 export const BLOCK_TYPES = [
   "heading",
@@ -199,6 +200,122 @@ export function extractBlockHeadings(blocks: ContentBlock[]): { id: string; text
       ? [{ id: `section-${block.id}`, text: block.text }]
       : [],
   );
+}
+
+export function splitBlocksByHeadings(
+  blocks: ContentBlock[],
+  noteId: string,
+  noteTitle: string,
+): Array<{
+  id: string;
+  slug: string;
+  order: number;
+  title: string;
+  mins: string | null;
+  source: string | null;
+  summary: string;
+  html: string;
+  blocks: ContentBlock[];
+  searchText: string | null;
+  assets: Record<string, { url: string; width?: number; height?: number }>;
+  imageAnnotations: Record<string, AnnotationElement[]>;
+}> {
+  const lessons: Array<{
+    id: string;
+    slug: string;
+    order: number;
+    title: string;
+    mins: string | null;
+    source: string | null;
+    summary: string;
+    html: string;
+    blocks: ContentBlock[];
+    searchText: string | null;
+    assets: Record<string, { url: string; width?: number; height?: number }>;
+    imageAnnotations: Record<string, AnnotationElement[]>;
+  }> = [];
+
+  let currentLessonBlocks: ContentBlock[] = [];
+  let currentLessonTitle = "";
+  let currentLessonOrder = 0;
+  let lessonCounter = 0;
+
+  for (const block of blocks) {
+    if (block.type === "heading" && block.level === 2 && block.text.trim()) {
+      // Save previous lesson if it has content
+      if (currentLessonBlocks.length > 0) {
+        lessonCounter++;
+        lessons.push({
+          id: `${noteId}-lesson-${lessonCounter}`,
+          slug: `${noteId}-lesson-${lessonCounter}`,
+          order: currentLessonOrder,
+          title: currentLessonTitle || `درس ${lessonCounter}`,
+          mins: null,
+          source: null,
+          summary: "",
+          html: "",
+          blocks: currentLessonBlocks,
+          searchText: currentLessonBlocks
+            .filter((b) => b.type === "paragraph" || b.type === "heading")
+            .map((b) => (b as { text: string }).text)
+            .join(" "),
+          assets: {},
+          imageAnnotations: {},
+        });
+      }
+      // Start new lesson
+      currentLessonTitle = block.text.trim();
+      currentLessonOrder = lessonCounter + 1;
+      currentLessonBlocks = [];
+    } else {
+      currentLessonBlocks.push(block);
+    }
+  }
+
+  // Save last lesson
+  if (currentLessonBlocks.length > 0) {
+    lessonCounter++;
+    lessons.push({
+      id: `${noteId}-lesson-${lessonCounter}`,
+      slug: `${noteId}-lesson-${lessonCounter}`,
+      order: currentLessonOrder,
+      title: currentLessonTitle || `درس ${lessonCounter}`,
+      mins: null,
+      source: null,
+      summary: "",
+      html: "",
+      blocks: currentLessonBlocks,
+      searchText: currentLessonBlocks
+        .filter((b) => b.type === "paragraph" || b.type === "heading")
+        .map((b) => (b as { text: string }).text)
+        .join(" "),
+      assets: {},
+      imageAnnotations: {},
+    });
+  }
+
+  // If no headings found, return single lesson with all blocks
+  if (lessons.length === 0 && blocks.length > 0) {
+    lessons.push({
+      id: noteId,
+      slug: noteId,
+      order: 1,
+      title: noteTitle,
+      mins: null,
+      source: null,
+      summary: "",
+      html: "",
+      blocks,
+      searchText: blocks
+        .filter((b) => b.type === "paragraph" || b.type === "heading")
+        .map((b) => (b as { text: string }).text)
+        .join(" "),
+      assets: {},
+      imageAnnotations: {},
+    });
+  }
+
+  return lessons;
 }
 
 export function isImageOnly(blocks: ContentBlock[]): boolean {

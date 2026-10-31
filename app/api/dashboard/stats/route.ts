@@ -34,47 +34,46 @@ export async function GET() {
   ]);
 
   const [
-    modules,
-    moduleProgress,
-    moduleNotes,
-    moduleAnnotations,
-    moduleBookmarks,
-    moduleReviews,
-    moduleAttempts,
+    notes,
+    noteProgress,
+    noteNotes,
+    noteAnnotations,
+    noteBookmarks,
+    noteReviews,
+    noteAttempts,
     studySessions,
   ] = await Promise.all([
-    db.module.findMany({
+    db.note.findMany({
       orderBy: [{ order: "asc" }, { createdAt: "asc" }],
       include: {
-        lessons: { select: { id: true } },
         _count: { select: { questions: true, flashcards: true } },
       },
     }),
-    db.lessonProgress.findMany({
+    db.noteProgress.findMany({
       where: { userId: session.userId },
-      select: { done: true, updatedAt: true, lesson: { select: { moduleId: true } } },
+      select: { done: true, updatedAt: true, noteId: true },
     }),
-    db.lessonNote.findMany({
+    db.noteNote.findMany({
       where: { userId: session.userId },
-      select: { updatedAt: true, lesson: { select: { moduleId: true } } },
+      select: { updatedAt: true, noteId: true },
     }),
-    db.lessonAnnotation.findMany({
+    db.textAnnotation.findMany({
       where: { userId: session.userId },
-      select: { updatedAt: true, lesson: { select: { moduleId: true } } },
+      select: { updatedAt: true, noteId: true },
     }),
     db.bookmark.findMany({
       where: { userId: session.userId },
-      select: { createdAt: true, lesson: { select: { moduleId: true } } },
+      select: { createdAt: true, noteId: true },
     }),
     db.flashcardReview.findMany({
       where: { userId: session.userId },
-      select: { due: true, card: { select: { moduleId: true } } },
+      select: { due: true, card: { select: { noteId: true } } },
     }),
-    db.moduleQuizAttempt.findMany({
+    db.noteQuizAttempt.findMany({
       where: { userId: session.userId },
       orderBy: { createdAt: "desc" },
       select: {
-        moduleId: true,
+        noteId: true,
         mode: true,
         score: true,
         total: true,
@@ -216,12 +215,12 @@ export async function GET() {
         at: r.answeredAt,
       };
     }),
-    ...moduleAttempts.slice(0, 10).map((attempt) => ({
+    ...noteAttempts.slice(0, 10).map((attempt) => ({
       type: "module-quiz" as const,
       courseId: "",
-      courseTitle: moduleById.get(attempt.moduleId)?.cardTitle ?? "",
-      moduleId: attempt.moduleId,
-      detail: `آزمون ماژول - ${attempt.correct} از ${attempt.total}`,
+      courseTitle: noteById.get(attempt.noteId)?.cardTitle ?? "",
+      moduleId: attempt.noteId,
+      detail: `آزمون جزوه - ${attempt.correct} از ${attempt.total}`,
       score: attempt.correct,
       total: attempt.total,
       at: attempt.createdAt,
@@ -230,8 +229,8 @@ export async function GET() {
     .sort((a, b) => b.at.getTime() - a.at.getTime())
     .slice(0, 10);
 
-  const moduleById = new Map(modules.map((module) => [module.id, module]));
-  const moduleRowsMap = new Map<
+  const noteById = new Map(notes.map((note) => [note.id, note]));
+  const noteRowsMap = new Map<
     string,
     {
       done: number;
@@ -245,9 +244,9 @@ export async function GET() {
       lastActivity: Date | null;
     }
   >();
-  const getModuleRow = (moduleId: string) => {
-    if (!moduleRowsMap.has(moduleId)) {
-      moduleRowsMap.set(moduleId, {
+  const getNoteRow = (noteId: string) => {
+    if (!noteRowsMap.has(noteId)) {
+      noteRowsMap.set(noteId, {
         done: 0,
         notes: 0,
         highlights: 0,
@@ -259,56 +258,56 @@ export async function GET() {
         lastActivity: null,
       });
     }
-    return moduleRowsMap.get(moduleId)!;
+    return noteRowsMap.get(noteId)!;
   };
   const bumpActivity = (row: { lastActivity: Date | null }, at: Date) => {
     if (!row.lastActivity || at > row.lastActivity) row.lastActivity = at;
   };
 
-  for (const moduleItem of modules) {
-    getModuleRow(moduleItem.id).due = moduleItem._count.flashcards;
+  for (const noteItem of notes) {
+    getNoteRow(noteItem.id).due = noteItem._count.flashcards;
   }
 
-  for (const row of moduleProgress) {
-    if (!moduleById.has(row.lesson.moduleId)) continue;
-    const entry = getModuleRow(row.lesson.moduleId);
+  for (const row of noteProgress) {
+    if (!noteById.has(row.noteId)) continue;
+    const entry = getNoteRow(row.noteId);
     if (row.done) entry.done += 1;
     bumpActivity(entry, row.updatedAt);
   }
-  for (const row of moduleNotes) {
-    if (!moduleById.has(row.lesson.moduleId)) continue;
-    const entry = getModuleRow(row.lesson.moduleId);
+  for (const row of noteNotes) {
+    if (!noteById.has(row.noteId)) continue;
+    const entry = getNoteRow(row.noteId);
     entry.notes += 1;
     bumpActivity(entry, row.updatedAt);
   }
-  for (const row of moduleAnnotations) {
-    if (!moduleById.has(row.lesson.moduleId)) continue;
-    const entry = getModuleRow(row.lesson.moduleId);
+  for (const row of noteAnnotations) {
+    if (!noteById.has(row.noteId)) continue;
+    const entry = getNoteRow(row.noteId);
     entry.highlights += 1;
     bumpActivity(entry, row.updatedAt);
   }
-  for (const row of moduleBookmarks) {
-    if (!moduleById.has(row.lesson.moduleId)) continue;
-    const entry = getModuleRow(row.lesson.moduleId);
+  for (const row of noteBookmarks) {
+    if (!noteById.has(row.noteId)) continue;
+    const entry = getNoteRow(row.noteId);
     entry.bookmarks += 1;
     bumpActivity(entry, row.createdAt);
   }
   const now = Date.now();
-  for (const row of moduleReviews) {
-    if (!moduleById.has(row.card.moduleId)) continue;
-    if (row.due.getTime() > now) getModuleRow(row.card.moduleId).due -= 1;
+  for (const row of noteReviews) {
+    if (!noteById.has(row.card.noteId)) continue;
+    if (row.due.getTime() > now) getNoteRow(row.card.noteId).due -= 1;
   }
-  for (const row of moduleAttempts) {
-    if (!moduleById.has(row.moduleId)) continue;
-    const entry = getModuleRow(row.moduleId);
+  for (const row of noteAttempts) {
+    if (!noteById.has(row.noteId)) continue;
+    const entry = getNoteRow(row.noteId);
     entry.quizCorrect += row.correct;
     entry.quizTotal += row.total;
     entry.quizAttempts += 1;
     bumpActivity(entry, row.createdAt);
   }
 
-  const moduleRows = modules.map((module) => {
-    const entry = moduleRowsMap.get(module.id) ?? {
+  const noteRows = notes.map((note) => {
+    const entry = noteRowsMap.get(note.id) ?? {
       done: 0,
       notes: 0,
       highlights: 0,
@@ -319,20 +318,19 @@ export async function GET() {
       quizAttempts: 0,
       lastActivity: null,
     };
-    const lessonCount = module.lessons.length;
     return {
-      id: module.id,
-      title: module.cardTitle,
-      description: module.cardDescription ?? module.description,
-      lessonCount,
+      id: note.id,
+      title: note.cardTitle,
+      description: note.cardDescription ?? note.description,
+      lessonCount: 1,
       done: entry.done,
-      percent: lessonCount ? Math.round((entry.done / lessonCount) * 100) : 0,
+      percent: entry.done,
       notes: entry.notes,
       highlights: entry.highlights,
       bookmarks: entry.bookmarks,
       dueCards: entry.due,
-      questionCount: module._count.questions,
-      flashcardCount: module._count.flashcards,
+      questionCount: note._count.questions,
+      flashcardCount: note._count.flashcards,
       quizCorrect: entry.quizCorrect,
       quizTotal: entry.quizTotal,
       quizPercent: entry.quizTotal
@@ -343,7 +341,7 @@ export async function GET() {
     };
   });
 
-  const moduleTotals = moduleRows.reduce(
+  const noteTotals = noteRows.reduce(
     (sum, row) => ({
       totalLessons: sum.totalLessons + row.lessonCount,
       completedLessons: sum.completedLessons + row.done,
@@ -402,12 +400,12 @@ export async function GET() {
     return { date: key, minutes: studyByDay.get(key) ?? 0 };
   });
 
-  const moduleQuizCorrect = moduleTotals.quizCorrect;
-  const moduleQuizTotal = moduleTotals.quizTotal;
+  const moduleQuizCorrect = noteTotals.quizCorrect;
+  const moduleQuizTotal = noteTotals.quizTotal;
 
   return ok({
     enrolled,
-    modules: moduleRows.map((row) => ({
+    modules: noteRows.map((row) => ({
       ...row,
       lastActivity: row.lastActivity?.toISOString() ?? null,
     })),
@@ -418,14 +416,14 @@ export async function GET() {
       totalStudyTimeSeconds,
       totalAttempts: attempts.length,
       totalCourses: courses.length,
-      totalModules: modules.length,
-      totalLessons: moduleTotals.totalLessons,
-      completedLessons: moduleTotals.completedLessons,
-      notes: moduleTotals.notes,
-      highlights: moduleTotals.highlights,
-      bookmarks: moduleTotals.bookmarks,
-      dueCards: moduleTotals.dueCards,
-      moduleQuizAttempts: moduleTotals.quizAttempts,
+      totalModules: notes.length,
+      totalLessons: noteTotals.totalLessons,
+      completedLessons: noteTotals.completedLessons,
+      notes: noteTotals.notes,
+      highlights: noteTotals.highlights,
+      bookmarks: noteTotals.bookmarks,
+      dueCards: noteTotals.dueCards,
+      moduleQuizAttempts: noteTotals.quizAttempts,
       moduleQuizAccuracy: moduleQuizTotal
         ? Math.round((moduleQuizCorrect / moduleQuizTotal) * 100)
         : 0,
